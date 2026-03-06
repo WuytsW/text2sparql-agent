@@ -14,7 +14,7 @@ app = FastAPI(
 )
 
 KNOWN_DATASETS: List[str] = [
-    "https://text2sparql.aksw.org/2025/dbpedia/",
+    "https://dbpedia.org/sparql",
     "https://text2sparql.aksw.org/2025/corporate/"
 ]
 
