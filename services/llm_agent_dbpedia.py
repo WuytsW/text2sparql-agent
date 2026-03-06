@@ -1,10 +1,12 @@
-from langchain import hub
-from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langsmith import Client
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, AIMessage
 from langgraph.graph import StateGraph, END
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
+from dotenv import load_dotenv
+
 
 from typing import List
 
@@ -31,18 +33,20 @@ class LLMAgentDBpedia:
     
     def __init__(
             self,
-            openai_model_name: str = "gpt-4o-2024-05-13",
+            model_name: str = "openai/gpt-4o-mini",
             embedding_model_name: str = "intfloat/multilingual-e5-large",
             return_N: int = 5,
             tools: List = [dbpedia_el],
             lang: str = "en"
         ):
+
+        load_dotenv()
         """Initialize the LLM agent with any required configurations"""
         self.model_name = "text-to-sparql-mock"
         self.sparql_endpoint = "http://141.57.8.18:40201/dbpedia/sparql"
         self.lang = lang
         self.embedding_model_name = embedding_model_name
-        self.openai_model_name = openai_model_name
+        self.model_name = model_name
 
         ### START Initialize embeddings
         model_kwargs = {'device': 'cpu'}
@@ -68,14 +72,22 @@ class LLMAgentDBpedia:
         ### START Initialize agent
         self.tools = tools
         self.plan_llm = ChatOpenAI(
-            model=openai_model_name,
-            temperature=0
+            model=model_name,
+            temperature=0,
+            api_key=os.getenv("OPENROUTER_API_KEY"),
+            base_url="https://openrouter.ai/api/v1",
         ).with_structured_output(Plan)
 
-        prompt = hub.pull("hwchase17/openai-functions-agent")
+        
+        client = Client()
+        prompt = client.pull_prompt("hwchase17/openai-functions-agent")
 
         # Choose the LLM that will drive the agent
-        self.llm = ChatOpenAI(model=openai_model_name)
+        self.llm = ChatOpenAI(
+            model=model_name,
+            api_key=os.getenv("OPENROUTER_API_KEY"),
+            base_url="https://openrouter.ai/api/v1",
+        )
 
         # Construct the OpenAI Functions agent
         self.agent_runnable = create_tool_calling_agent(self.llm, tools, prompt)
@@ -243,13 +255,15 @@ LIMIT 10"""
 
 
 if __name__ == "__main__":   
+
     dbpedia_agent = LLMAgentDBpedia(
-        openai_model_name="gpt-4o-2024-05-13",
+        model_name="openai/gpt-4o-mini",
         embedding_model_name="intfloat/multilingual-e5-large",
         return_N=5,
-        tools=[el],
+        tools=[dbpedia_el],
         lang="en"
     )
+
 
     text = "Who is the author of the book 'The Great Gatsby'?"         
 
@@ -257,3 +271,4 @@ if __name__ == "__main__":
         
     print(f"Input: {text}")
     print(f"Output: {query}")
+    
