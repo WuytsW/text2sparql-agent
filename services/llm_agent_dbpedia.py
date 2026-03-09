@@ -43,7 +43,7 @@ class LLMAgentDBpedia:
         load_dotenv()
         """Initialize the LLM agent with any required configurations"""
         self.model_name = "text-to-sparql-mock"
-        self.sparql_endpoint = "http://141.57.8.18:40201/dbpedia/sparql"
+        self.sparql_endpoint = "https://dbpedia.org/sparql"
         self.lang = lang
         self.embedding_model_name = embedding_model_name
         self.model_name = model_name
@@ -240,6 +240,8 @@ class LLMAgentDBpedia:
             )
         
             sparql_result = agent_result['chat_history'][-1].content
+
+            logging.info(f"Generated SPARQL query: {sparql_result}")
 
             generated_query = post_process(sparql_result)
 

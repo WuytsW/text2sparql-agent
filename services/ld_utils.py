@@ -87,7 +87,7 @@ def post_process(result):
 
     return query
 
-def execute(query: str, endpoint_url: str = 'http://141.57.8.18:40201/dbpedia/sparql'):
+def execute(query: str, endpoint_url: str = 'https://dbpedia.org/sparql'):
     try:
         query = post_process(query)
         parse_object = parseQuery(query)
