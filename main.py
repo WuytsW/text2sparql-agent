@@ -19,7 +19,7 @@ KNOWN_DATASETS: List[str] = [
 ]
 
 dbpedia_agent = LLMAgentDBpedia()
-corporate_agent = LLMAgentCorporate()
+#corporate_agent = LLMAgentCorporate()
 
 @app.get("/api")
 async def get_answer(question: str, dataset: str):
@@ -38,8 +38,8 @@ async def get_answer(question: str, dataset: str):
     
     if "dbpedia" in dataset:
         sparql_query = dbpedia_agent.generate_sparql(question)
-    elif "corporate" in dataset:
-        sparql_query = corporate_agent.generate_sparql(question)
+    #elif "corporate" in dataset:
+       # sparql_query = corporate_agent.generate_sparql(question)
     else:
         raise HTTPException(status_code=404, detail="Unknown dataset. Please use one of the known datasets.")
     
