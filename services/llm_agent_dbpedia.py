@@ -103,7 +103,9 @@ class LLMAgentDBpedia:
     def _plan_step(self, state: PlanExecute):
         try:
             plan = self.plan_llm.invoke(planner_prompt_dct[self.lang].format(objective=state["input"]))
+            logging.info(f"Generated plan: {plan.steps}")
             return {"plan": plan.steps + [last_task]}
+
         except Exception as e:
             plan = [last_task]
             return {"plan": plan}
@@ -166,6 +168,12 @@ class LLMAgentDBpedia:
 
         # Add the feedback step
         workflow.add_node("feedback", self._feedback_step)
+
+
+        # Add the new step
+        
+
+
 
         workflow.set_entry_point("planner")
 
