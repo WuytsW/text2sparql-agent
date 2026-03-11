@@ -1,0 +1,46 @@
+Finished processing all questions
+{
+    "total_questions": 408,
+    "final_tp": 17234,
+    "final_fp": 1263,
+    "final_fn": 2449,
+    "final_precision": 0.9317186570795264,
+    "final_recall": 0.8755779098714627,
+    "final_f1": 0.9027763226820325,
+    "questions_with_f1_less_than_1": 125
+}
+
+
+
+
+[401/408] In which countries do people speak Japanese?
+Question P/R/F1: 1.0000 / 1.0000 / 1.0000
+Running  P/R/F1: 0.9337 / 0.8757 / 0.9038
+
+[402/408] Which of Tim Burton's films had the highest budget?
+Question P/R/F1: 0.0000 / 0.0000 / 0.0000
+Running  P/R/F1: 0.9336 / 0.8756 / 0.9037
+
+[403/408] Which museum in New York has the most visitors?
+Question P/R/F1: 1.0000 / 1.0000 / 1.0000
+Running  P/R/F1: 0.9337 / 0.8756 / 0.9037
+
+[404/408] What was the first Queen album?
+Question P/R/F1: 1.0000 / 1.0000 / 1.0000
+Running  P/R/F1: 0.9337 / 0.8756 / 0.9037
+
+[405/408] What was the first name of the band Queens of the Stone Age?
+Question P/R/F1: 0.0000 / 0.0000 / 0.0000
+Running  P/R/F1: 0.9330 / 0.8756 / 0.9034
+
+[406/408] What was the last movie with Alec Guinness?
+Question P/R/F1: 0.0000 / 0.0000 / 0.0000
+Running  P/R/F1: 0.9323 / 0.8756 / 0.9031
+
+[407/408] Give me all actors starring in Last Action Hero.
+Question P/R/F1: 1.0000 / 1.0000 / 1.0000
+Running  P/R/F1: 0.9324 / 0.8756 / 0.9031
+
+[408/408] Who discovered Pluto?
+Question P/R/F1: 0.0000 / 0.0000 / 0.0000
+Running  P/R/F1: 0.9317 / 0.8756 / 0.9028

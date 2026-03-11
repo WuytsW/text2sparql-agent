@@ -1,0 +1,418 @@
+Reading: qald_9_sparql_results.json
+
+[USE ] index=0 | question=List all boardgames by GMT. | P=1.0000 R=1.0000 F1=1.0000 | pred=11 gold=11
+[SKIP] index=1 | question=Who developed Skype? | reason=gold_values is empty
+[USE ] index=2 | question=Which people were born in Heraklion? | P=1.0000 R=1.0000 F1=1.0000 | pred=143 gold=143
+[SKIP] index=3 | question=In which U.S. state is Area 51 located? | reason=gold_values is empty
+[SKIP] index=4 | question=Who is the mayor of New York City? | reason=gold_values is empty
+[USE ] index=5 | question=Which countries have places with more than two caves? | P=0.7204 R=0.7528 F1=0.7363 | pred=93 gold=89
+[SKIP] index=6 | question=Where did Abraham Lincoln die? | reason=gold_values is empty
+[SKIP] index=7 | question=Which airports does Air China serve? | reason=gold_values is empty
+[USE ] index=8 | question=Give me all actors starring in movies directed by and starring William Shatner. | P=1.0000 R=0.4667 F1=0.6364 | pred=7 gold=15
+[USE ] index=9 | question=What are the official languages of the Philippines? | P=1.0000 R=1.0000 F1=1.0000 | pred=2 gold=2
+[USE ] index=10 | question=Give me all Danish films. | P=1.0000 R=1.0000 F1=1.0000 | pred=129 gold=129
+[USE ] index=11 | question=Which movies starring Brad Pitt were directed by Guy Ritchie? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=12 | question=Give me the grandchildren of Bruce Lee. | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=1
+[SKIP] index=13 | question=Which other weapons did the designer of the Uzi develop? | reason=gold_values is empty
+[SKIP] index=14 | question=Who is the owner of Universal Studios? | reason=gold_values is empty
+[SKIP] index=15 | question=Which state of the USA has the highest population density? | reason=gold_values is empty
+[SKIP] index=16 | question=Which monarchs were married to a German? | reason=gold_values is empty
+[USE ] index=17 | question=Which organizations were founded in 1950? | P=1.0000 R=0.8054 F1=0.8922 | pred=691 gold=858
+[USE ] index=18 | question=Who created the comic Captain America? | P=1.0000 R=1.0000 F1=1.0000 | pred=2 gold=2
+[USE ] index=19 | question=Give me the Apollo 14 astronauts. | P=0.6667 R=1.0000 F1=0.8000 | pred=3 gold=2
+[USE ] index=20 | question=Who wrote the book The pillars of the Earth? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=21 | question=Which state of the United States of America has the highest density? | P=0.0000 R=0.0000 F1=0.0000 | pred=1 gold=1
+[USE ] index=22 | question=Which spaceflights were launched from Baikonur? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=12
+[USE ] index=23 | question=Give me a list of all trumpet players that were bandleaders. | P=1.0000 R=1.0000 F1=1.0000 | pred=21 gold=21
+[SKIP] index=24 | question=Which U.S. states are in the same timezone as Utah? | reason=gold_values is empty
+[SKIP] index=25 | question=Which U.S. states possess gold minerals? | reason=gold_values is empty
+[SKIP] index=26 | question=Who is the daughter of Ingrid Bergman married to? | reason=gold_values is empty
+[USE ] index=27 | question=How deep is Lake Placid? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=1
+[USE ] index=28 | question=Show me all museums in London. | P=1.0000 R=1.0000 F1=1.0000 | pred=70 gold=70
+[USE ] index=29 | question=Which caves have more than 3 entrances? | P=1.0000 R=1.0000 F1=1.0000 | pred=72 gold=72
+[USE ] index=30 | question=Who is the tallest player of the Atlanta Falcons? | P=0.0000 R=0.0000 F1=0.0000 | pred=2 gold=1
+[USE ] index=31 | question=What are the top-10 action role-playing video games according to IGN? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=10
+[USE ] index=32 | question=Give me all writers that won the Nobel Prize in literature. | P=1.0000 R=1.0000 F1=1.0000 | pred=28 gold=28
+[USE ] index=33 | question=Show me all basketball players that are higher than 2 meters. | P=1.0000 R=1.0000 F1=1.0000 | pred=5744 gold=5744
+[USE ] index=34 | question=When was the Statue of Liberty built? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=1
+[SKIP] index=35 | question=Which states border Illinois? | reason=gold_values is empty
+[USE ] index=36 | question=Who developed Minecraft? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=37 | question=Where did Hillel Slovak die? | P=1.0000 R=1.0000 F1=1.0000 | pred=2 gold=2
+[USE ] index=38 | question=What movies does Jesse Eisenberg play in? | P=1.0000 R=1.0000 F1=1.0000 | pred=40 gold=40
+[USE ] index=39 | question=Give all swimmers that were born in Moscow. | P=1.0000 R=1.0000 F1=1.0000 | pred=76 gold=76
+[USE ] index=40 | question=Give me all cosmonauts. | P=0.0000 R=0.0000 F1=0.0000 | pred=720 gold=51
+[USE ] index=41 | question=Give me all Swiss non-profit organizations. | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=14
+[USE ] index=42 | question=Which presidents were born in 1945? | P=1.0000 R=1.0000 F1=1.0000 | pred=9 gold=9
+[USE ] index=43 | question=What kind of music did Lou Reed play? | P=1.0000 R=1.0000 F1=1.0000 | pred=4 gold=4
+[USE ] index=44 | question=Where do the Red Sox play? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=45 | question=Show a list of soccer clubs that play in the Bundesliga. | reason=gold_values is empty
+[USE ] index=46 | question=Which volcanos in Japan erupted since 2000? | P=1.0000 R=1.0000 F1=1.0000 | pred=10 gold=10
+[USE ] index=47 | question=Which bridges cross the Seine? | P=1.0000 R=1.0000 F1=1.0000 | pred=44 gold=44
+[USE ] index=48 | question=What is the official color of the University of Oxford? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=49 | question=How many films did Hal Roach produce? | P=0.0000 R=0.0000 F1=0.0000 | pred=1 gold=1
+[USE ] index=50 | question=Give me all Danish movies. | P=1.0000 R=1.0000 F1=1.0000 | pred=129 gold=129
+[USE ] index=51 | question=What is the most frequent cause of death? | P=0.5000 R=1.0000 F1=0.6667 | pred=2 gold=1
+[USE ] index=52 | question=Who are the four youngest MVP basketball players? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=4
+[USE ] index=53 | question=Give me all companies in Munich. | P=0.0000 R=0.0000 F1=0.0000 | pred=13 gold=156
+[USE ] index=54 | question=Give me the capitals of all countries that the Himalayas run through. | P=1.0000 R=0.8333 F1=0.9091 | pred=5 gold=6
+[USE ] index=55 | question=How many movies did Park Chan-wook direct? | P=0.0000 R=0.0000 F1=0.0000 | pred=1 gold=1
+[USE ] index=56 | question=Which rivers flow into a German lake? | P=0.0000 R=0.0000 F1=0.0000 | pred=13 gold=47
+[USE ] index=57 | question=How many airlines are there? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=58 | question=Give me all islands that belong to Japan. | P=1.0000 R=1.0000 F1=1.0000 | pred=134 gold=134
+[SKIP] index=59 | question=How many inhabitants does Maribor have? | reason=gold_values is empty
+[USE ] index=60 | question=Give me all Apollo 14 astronauts. | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=2
+[USE ] index=61 | question=Which companies have more than 1 million employees? | P=1.0000 R=1.0000 F1=1.0000 | pred=2663 gold=2663
+[USE ] index=62 | question=In which films directed by Garry Marshall was Julia Roberts starring? | P=1.0000 R=1.0000 F1=1.0000 | pred=4 gold=4
+[USE ] index=63 | question=Give me all soccer clubs in the Premier League. | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=64 | question=What is the highest place of the Urals? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=1
+[USE ] index=65 | question=Who is the governor of Wyoming? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=2
+[USE ] index=66 | question=Where did the architect of the Eiffel Tower study? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=1
+[USE ] index=67 | question=Give me all world heritage sites designated within the past two years. | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=30
+[USE ] index=68 | question=Give me all actors who were born in Paris after 1950. | P=0.9706 R=1.0000 F1=0.9851 | pred=34 gold=33
+[USE ] index=69 | question=Which movies star both Liz Taylor and Richard Burton? | P=1.0000 R=0.7500 F1=0.8571 | pred=3 gold=4
+[USE ] index=70 | question=Give me all Australian nonprofit organizations. | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=16
+[USE ] index=71 | question=Which pope succeeded John Paul II? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=1
+[USE ] index=72 | question=Give me all ESA astronauts. | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=3
+[USE ] index=73 | question=Who was president of Pakistan in 1978? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=1
+[USE ] index=74 | question=Who is the owner of Rolls-Royce? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=1
+[USE ] index=75 | question=How many museums does Paris have? | P=0.0000 R=0.0000 F1=0.0000 | pred=1 gold=39
+[USE ] index=76 | question=Where was JFK assassinated? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=77 | question=Give me all federal chancellors of Germany. | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=13
+[USE ] index=78 | question=Show me everyone who was born on Halloween. | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=19
+[SKIP] index=79 | question=Which beer originated in Ireland? | reason=gold_values is empty
+[USE ] index=80 | question=To which countries does the Himalayan mountain system extend? | P=1.0000 R=1.0000 F1=1.0000 | pred=6 gold=6
+[USE ] index=81 | question=Which actors were born in Germany? | P=1.0000 R=0.4000 F1=0.5714 | pred=4 gold=10
+[USE ] index=82 | question=How much carbs does peanut butter have? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=83 | question=Who produced the most films? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=84 | question=How many employees does Google have? | reason=gold_values is empty
+[USE ] index=85 | question=Give me all actors who were born in Berlin. | P=1.0000 R=1.0000 F1=1.0000 | pred=3 gold=3
+[USE ] index=86 | question=Who created Goofy? | P=1.0000 R=1.0000 F1=1.0000 | pred=2 gold=2
+[USE ] index=87 | question=Which music albums contain the song Last Christmas? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=88 | question=When was Alberta admitted as province? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=89 | question=How many missions does the Soyuz programme have? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=90 | question=Give me all the TV shows with Neil Patrick Harris. | P=1.0000 R=1.0000 F1=1.0000 | pred=15 gold=15
+[USE ] index=91 | question=When were the Hells Angels founded? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=1
+[SKIP] index=92 | question=What is the net income of Apple? | reason=gold_values is empty
+[USE ] index=93 | question=Give me all Swedish holidays. | P=0.0000 R=0.0000 F1=0.0000 | pred=13 gold=7
+[SKIP] index=94 | question=In which city was the former Dutch queen Juliana buried? | reason=gold_values is empty
+[USE ] index=95 | question=List all the musicals with music by Leonard Bernstein. | P=1.0000 R=1.0000 F1=1.0000 | pred=10 gold=10
+[USE ] index=96 | question=Give me all companies in the advertising industry. | P=0.0000 R=0.0000 F1=0.0000 | pred=202 gold=1
+[USE ] index=97 | question=What is the largest metropolitan area in Washington state? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=1
+[SKIP] index=98 | question=Who killed John Lennon? | reason=gold_values is empty
+[USE ] index=99 | question=Which writers studied in Istanbul? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=42
+[USE ] index=100 | question=Give me all Australian metalcore bands. | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=35
+[USE ] index=101 | question=Which countries adopted the Euro? | P=1.0000 R=0.9623 F1=0.9808 | pred=51 gold=53
+[SKIP] index=102 | question=Give me all types of eating disorders. | reason=gold_values is empty
+[SKIP] index=103 | question=Was Marc Chagall a jew? | reason=gold_values is empty
+[USE ] index=104 | question=What was Brazil's lowest rank in the FIFA World Ranking? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=105 | question=How many films did Leonardo DiCaprio star in? | P=0.0000 R=0.0000 F1=0.0000 | pred=1 gold=1
+[SKIP] index=106 | question=Was Margaret Thatcher a chemist? | reason=gold_values is empty
+[SKIP] index=107 | question=Which U.S. states are in the same time zone as Utah? | reason=gold_values is empty
+[USE ] index=108 | question=Give me all books written by Danielle Steel. | P=1.0000 R=1.0000 F1=1.0000 | pred=54 gold=54
+[USE ] index=109 | question=Which country has the most official languages? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=110 | question=What is the total amount of men and women serving in the FDNY? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=3
+[USE ] index=111 | question=Which actor played Chewbacca? | P=1.0000 R=1.0000 F1=1.0000 | pred=2 gold=2
+[USE ] index=112 | question=Give me all libraries established earlier than 1400. | P=1.0000 R=1.0000 F1=1.0000 | pred=17 gold=17
+[USE ] index=113 | question=Which programming languages were influenced by Perl? | P=1.0000 R=0.9333 F1=0.9655 | pred=14 gold=15
+[SKIP] index=114 | question=In which U.S. state is Mount McKinley located? | reason=gold_values is empty
+[USE ] index=115 | question=What airlines are part of the SkyTeam alliance? | P=1.0000 R=1.0000 F1=1.0000 | pred=43 gold=43
+[USE ] index=116 | question=Which ships were called after Benjamin Franklin? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=8
+[SKIP] index=117 | question=Give me all Methodist politicians. | reason=gold_values is empty
+[SKIP] index=118 | question=What other books have been written by the author of The Fault in Our Stars? | reason=gold_values is empty
+[USE ] index=119 | question=What is the highest mountain? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=120 | question=Which poet wrote the most books? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=1
+[USE ] index=121 | question=Which programming languages influenced Javascript? | P=1.0000 R=1.0000 F1=1.0000 | pred=10 gold=10
+[USE ] index=122 | question=Which musician wrote the most books? | P=0.0000 R=0.0000 F1=0.0000 | pred=1 gold=1
+[USE ] index=123 | question=Which films starring Clint Eastwood did he direct himself? | P=1.0000 R=1.0000 F1=1.0000 | pred=23 gold=23
+[SKIP] index=124 | question=Which software has been developed by organizations founded in California? | reason=gold_values is empty
+[SKIP] index=125 | question=Which instruments does Cat Stevens play? | reason=gold_values is empty
+[USE ] index=126 | question=How many airlines are members of the Star Alliance? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=127 | question=Give me all actors called Baldwin. | reason=gold_values is empty
+[USE ] index=128 | question=Who wrote The Hunger Games? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=1
+[SKIP] index=129 | question=For which label did Elvis record his first album? | reason=gold_values is empty
+[SKIP] index=130 | question=Is Christian Bale starring in Batman Begins? | reason=gold_values is empty
+[USE ] index=131 | question=Where is the residence of the prime minister of Spain? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=1
+[USE ] index=132 | question=Which actor was casted in the most movies? | P=0.0000 R=0.0000 F1=0.0000 | pred=2 gold=1
+[USE ] index=133 | question=Which countries have more than two official languages? | P=1.0000 R=1.0000 F1=1.0000 | pred=655 gold=655
+[USE ] index=134 | question=Which countries have more than ten caves? | P=0.6667 R=0.6667 F1=0.6667 | pred=81 gold=81
+[USE ] index=135 | question=Show me all songs from Bruce Springsteen released between 1980 and 1990. | P=1.0000 R=1.0000 F1=1.0000 | pred=20 gold=20
+[USE ] index=136 | question=Which television shows were created by John Cleese? | P=1.0000 R=1.0000 F1=1.0000 | pred=6 gold=6
+[SKIP] index=137 | question=When did Latvia join the EU? | reason=gold_values is empty
+[USE ] index=138 | question=Which soccer players were born on Malta? | P=1.0000 R=1.0000 F1=1.0000 | pred=86 gold=86
+[USE ] index=139 | question=How many politicians graduated from Columbia University? | P=0.0000 R=0.0000 F1=0.0000 | pred=1 gold=1
+[USE ] index=140 | question=Give me the birthdays of all actors of the television show Charmed. | P=0.4500 R=1.0000 F1=0.6207 | pred=20 gold=9
+[USE ] index=141 | question=Which telecommunications organizations are located in Belgium? | P=0.0000 R=0.0000 F1=0.0000 | pred=3 gold=1
+[USE ] index=142 | question=Give me a list of all lakes in Denmark. | P=1.0000 R=1.0000 F1=1.0000 | pred=8 gold=8
+[USE ] index=143 | question=How many children does Eddie Murphy have? | P=0.0000 R=0.0000 F1=0.0000 | pred=1 gold=1
+[USE ] index=144 | question=Show me all English Gothic buildings in Kent. | P=1.0000 R=1.0000 F1=1.0000 | pred=20 gold=20
+[SKIP] index=145 | question=Who is the manager of Real Madrid? | reason=gold_values is empty
+[USE ] index=146 | question=In which countries can you pay using the West African CFA franc? | P=1.0000 R=1.0000 F1=1.0000 | pred=21 gold=21
+[USE ] index=147 | question=Which holidays are celebrated around the world? | P=1.0000 R=1.0000 F1=1.0000 | pred=2219 gold=2219
+[USE ] index=148 | question=What is the longest river? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=149 | question=Which organizations were founded in 1930? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=480
+[USE ] index=150 | question=What is the birth name of Angela Merkel? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=151 | question=Who has Tom Cruise been married to? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=2
+[USE ] index=152 | question=Which weapons did Heckler & Koch develop? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=18
+[USE ] index=153 | question=What is the smallest city by area in Germany? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=154 | question=What is the ruling party in Lisbon? | reason=gold_values is empty
+[SKIP] index=155 | question=How heavy is Jupiter's lightest moon? | reason=gold_values is empty
+[USE ] index=156 | question=How many employees does IBM have? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=157 | question=List all episodes of the first season of the HBO television series The Sopranos! | reason=gold_values is empty
+[USE ] index=158 | question=What does ICRO stand for? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=1
+[SKIP] index=159 | question=Does the new Battlestar Galactica series have more episodes than the old one? | reason=gold_values is empty
+[USE ] index=160 | question=Give me all films produced by Hal Roach. | P=1.0000 R=1.0000 F1=1.0000 | pred=538 gold=538
+[USE ] index=161 | question=Who played Agent Smith in Matrix? | P=1.0000 R=1.0000 F1=1.0000 | pred=4 gold=4
+[USE ] index=162 | question=Which Greek parties are pro-European? | P=1.0000 R=1.0000 F1=1.0000 | pred=8 gold=8
+[USE ] index=163 | question=Give me a list of all bandleaders that play trumpet. | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=21
+[USE ] index=164 | question=What is the second highest mountain on Earth? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=165 | question=Is Egypts largest city also its capital? | reason=gold_values is empty
+[USE ] index=166 | question=Which rockets were launched from Baikonur? | P=1.0000 R=1.0000 F1=1.0000 | pred=36 gold=36
+[USE ] index=167 | question=How many programming languages are there? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=168 | question=Which Chess players died in the same place they were born in? | P=1.0000 R=1.0000 F1=1.0000 | pred=268 gold=268
+[SKIP] index=169 | question=Who is the owner of Facebook? | reason=gold_values is empty
+[USE ] index=170 | question=Give me all movies with Tom Cruise. | P=1.0000 R=1.0000 F1=1.0000 | pred=46 gold=46
+[USE ] index=171 | question=In which U.S. state is Fort Knox located? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=172 | question=Give me all cities in New Jersey with more than 100000 inhabitants. | reason=gold_values is empty
+[USE ] index=173 | question=Which mountains are higher than the Nanga Parbat? | P=1.0000 R=1.0000 F1=1.0000 | pred=17 gold=17
+[SKIP] index=174 | question=Give me all B-sides of the Ramones. | reason=gold_values is empty
+[SKIP] index=175 | question=What are the specialities of the UNC Health Care? | reason=gold_values is empty
+[USE ] index=176 | question=When was Olof Palme shot? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=177 | question=List the seven kings of Rome. | P=0.0000 R=0.0000 F1=0.0000 | pred=4 gold=7
+[USE ] index=178 | question=Give me all people that were born in Vienna and died in Berlin. | P=1.0000 R=1.0000 F1=1.0000 | pred=23 gold=23
+[SKIP] index=179 | question=Is Darth Vader Luke’s father? | reason=gold_values is empty
+[USE ] index=180 | question=Show me all the breweries in Australia. | P=1.0000 R=0.3333 F1=0.5000 | pred=1 gold=3
+[USE ] index=181 | question=Give me all films produced by Steven Spielberg with a budget of at least $80 million. | P=0.5000 R=0.4286 F1=0.4615 | pred=6 gold=7
+[USE ] index=182 | question=Give me all soccer clubs in Spain. | P=1.0000 R=0.1971 F1=0.3294 | pred=235 gold=1192
+[USE ] index=183 | question=Who produced films starring Natalie Portman? | P=1.0000 R=1.0000 F1=1.0000 | pred=71 gold=71
+[USE ] index=184 | question=Give me all breeds of the German Shepherd dog. | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=24
+[USE ] index=185 | question=Who is the heaviest player of the Chicago Bulls? | P=0.0000 R=0.0000 F1=0.0000 | pred=1 gold=1
+[USE ] index=186 | question=Which languages are spoken in Estonia? | P=1.0000 R=0.0833 F1=0.1538 | pred=1 gold=12
+[USE ] index=187 | question=What is the largest country in the world? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=188 | question=What is the largest city in america? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=1
+[SKIP] index=189 | question=Who was the pope that founded the Vatican Television? | reason=gold_values is empty
+[SKIP] index=190 | question=Who discovered Ceres? | reason=gold_values is empty
+[SKIP] index=191 | question=Who is the king of the Netherlands? | reason=gold_values is empty
+[SKIP] index=192 | question=Is Cola a beverage? | reason=gold_values is empty
+[USE ] index=193 | question=What is the alma mater of the chancellor of Germany Angela Merkel? | P=1.0000 R=1.0000 F1=1.0000 | pred=2 gold=2
+[USE ] index=194 | question=Who wrote the book Les Piliers de la terre? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=1
+[SKIP] index=195 | question=Which airports does Yeti Airlines serve? | reason=gold_values is empty
+[USE ] index=196 | question=Where is the birthplace of Goethe? | P=1.0000 R=1.0000 F1=1.0000 | pred=2 gold=2
+[SKIP] index=197 | question=Was the Cuban Missile Crisis earlier than the Bay of Pigs Invasion? | reason=gold_values is empty
+[USE ] index=198 | question=Which ingredients do I need for carrot cake? | P=1.0000 R=1.0000 F1=1.0000 | pred=5 gold=5
+[SKIP] index=199 | question=Who created Wikipedia? | reason=gold_values is empty
+[USE ] index=200 | question=What is the highest mountain in Saxony Germany? | P=0.0000 R=0.0000 F1=0.0000 | pred=1 gold=1
+[USE ] index=201 | question=Who is the current federal minister of finance in Germany? | P=1.0000 R=1.0000 F1=1.0000 | pred=2 gold=2
+[USE ] index=202 | question=In which country is Mecca located? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=203 | question=Who played Gus Fring in Breaking Bad? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=204 | question=In which country does the Nile start? | reason=gold_values is empty
+[USE ] index=205 | question=In which state Penn State University is located? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=206 | question=What is the biggest stadium in Spain? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=207 | question=Who is the coach of Ankara's ice hockey team? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=208 | question=How large is the area of UK? | reason=gold_values is empty
+[USE ] index=209 | question=Who created Batman? | P=1.0000 R=1.0000 F1=1.0000 | pred=2 gold=2
+[SKIP] index=210 | question=Was Sigmund Freud married? | reason=gold_values is empty
+[USE ] index=211 | question=Who are the developers of DBpedia? | P=1.0000 R=1.0000 F1=1.0000 | pred=2 gold=2
+[USE ] index=212 | question=Give me all movies directed by Francis Ford Coppola. | P=1.0000 R=1.0000 F1=1.0000 | pred=34 gold=34
+[SKIP] index=213 | question=Are tree frogs a type of amphibian? | reason=gold_values is empty
+[SKIP] index=214 | question=What is the location of the Houses of Parliament? | reason=gold_values is empty
+[USE ] index=215 | question=how much is the elevation of Düsseldorf Airport ? | P=0.5000 R=1.0000 F1=0.6667 | pred=2 gold=1
+[USE ] index=216 | question=How much is the population of mexico city ? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=217 | question=when was the founding date of french fifth republic? | reason=gold_values is empty
+[SKIP] index=218 | question=Who was the first King of England? | reason=gold_values is empty
+[USE ] index=219 | question=Who is the editor of Forbes? | P=1.0000 R=1.0000 F1=1.0000 | pred=2 gold=2
+[USE ] index=220 | question=Which awards did Douglas Hofstadter win? | P=1.0000 R=1.0000 F1=1.0000 | pred=4 gold=4
+[USE ] index=221 | question=Who is the youngest Darts player? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=222 | question=Is horse racing a sport? | reason=gold_values is empty
+[USE ] index=223 | question=Which river does the Brooklyn Bridge cross? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=224 | question=How many people live in Poland? | reason=gold_values is empty
+[USE ] index=225 | question=When was the last episode of the TV series Friends aired? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=226 | question=Is the wife of president Obama called Michelle? | reason=gold_values is empty
+[USE ] index=227 | question=Who is 8th president of US? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=1
+[USE ] index=228 | question=how much is the total population of european union? | P=0.0000 R=0.0000 F1=0.0000 | pred=13 gold=1
+[USE ] index=229 | question=Give me all launch pads operated by NASA. | P=1.0000 R=1.0000 F1=1.0000 | pred=12 gold=12
+[USE ] index=230 | question=Who developed the video game World of Warcraft? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=231 | question=What is the birth name of Adele? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=232 | question=What is the population of Cairo? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=233 | question=Is Frank Herbert still alive? | reason=gold_values is empty
+[USE ] index=234 | question=What is the last work of Dan Brown? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=235 | question=Where is Sungkyunkwan University? | reason=gold_values is empty
+[USE ] index=236 | question=Who is the author of the interpretation of dreams? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=237 | question=When was the death of Shakespeare? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=238 | question=Who developed Slack? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=1
+[USE ] index=239 | question=Where is the origin of Carolina reaper? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=240 | question=In which year was Rachel Stevens born? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=241 | question=How often did Jane Fonda marry? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=242 | question=Was the wife of president Lincoln called Mary? | reason=gold_values is empty
+[SKIP] index=243 | question=Which cities does the Weser flow through? | reason=gold_values is empty
+[USE ] index=244 | question=In which programming language is GIMP written? | P=1.0000 R=1.0000 F1=1.0000 | pred=4 gold=4
+[USE ] index=245 | question=Which university did Angela Merkel attend? | P=1.0000 R=1.0000 F1=1.0000 | pred=2 gold=2
+[USE ] index=246 | question=List all the musicals with music by Elton John. | P=1.0000 R=1.0000 F1=1.0000 | pred=6 gold=6
+[USE ] index=247 | question=How many Aldi stores are there? | P=0.0000 R=0.0000 F1=0.0000 | pred=1 gold=1
+[USE ] index=248 | question=What is the longest river in the world? | P=0.0000 R=0.0000 F1=0.0000 | pred=1 gold=1
+[SKIP] index=249 | question=When was John Adams born? | reason=gold_values is empty
+[USE ] index=250 | question=Which companies produce hovercrafts? | P=1.0000 R=1.0000 F1=1.0000 | pred=5 gold=5
+[USE ] index=251 | question=Who was the wife of U.S. president Lincoln? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=252 | question=Which species does an elephant belong? | reason=gold_values is empty
+[USE ] index=253 | question=How many people live in the capital of Australia? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=254 | question=In which ancient empire could you pay with cocoa beans? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=4
+[USE ] index=255 | question=How many theories did Albert Einstein come up with? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=256 | question=Who composed the soundtrack for Cameron's Titanic? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=1
+[USE ] index=257 | question=Give me the runtime of Toy Story. | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=258 | question=With how many countries Iran has borders? | P=0.0000 R=0.0000 F1=0.0000 | pred=1 gold=8
+[SKIP] index=259 | question=Which electronics companies were founded in Beijing? | reason=gold_values is empty
+[SKIP] index=260 | question=Who was the successor of John F. Kennedy? | reason=gold_values is empty
+[USE ] index=261 | question=Who is the mayor of Paris? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=262 | question=Did Arnold Schwarzenegger attend a university? | reason=gold_values is empty
+[SKIP] index=263 | question=Is James Bond married? | reason=gold_values is empty
+[SKIP] index=264 | question=Does the Isar flow into a lake? | reason=gold_values is empty
+[USE ] index=265 | question=Which Indian company has the most employees? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=266 | question=Who was John F. Kennedy's vice president? | reason=gold_values is empty
+[SKIP] index=267 | question=Which country does the creator of Miffy come from? | reason=gold_values is empty
+[SKIP] index=268 | question=In what city is the Heineken brewery? | reason=gold_values is empty
+[SKIP] index=269 | question=Is Barack Obama a democrat? | reason=gold_values is empty
+[USE ] index=270 | question=List the children of Margaret Thatcher. | P=1.0000 R=1.0000 F1=1.0000 | pred=2 gold=2
+[USE ] index=271 | question=From which region is the Melon de Bourgogne? | P=1.0000 R=1.0000 F1=1.0000 | pred=4 gold=4
+[USE ] index=272 | question=how big is the total area of North Rhine- Westphalia? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=273 | question=Which city has the most inhabitants? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=274 | question=What is Donald Trump's main business? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=3
+[SKIP] index=275 | question=When will start the final match of the football world cup 2018? | reason=gold_values is empty
+[USE ] index=276 | question=Which films did Stanley Kubrick direct? | P=1.0000 R=1.0000 F1=1.0000 | pred=16 gold=16
+[SKIP] index=277 | question=how much is the population Iraq? | reason=gold_values is empty
+[USE ] index=278 | question=How many inhabitants does the largest city in Canada have? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=279 | question=Who is the mayor of the capital of French Polynesia? | reason=gold_values is empty
+[USE ] index=280 | question=Give me all actors starring in movies directed by William Shatner. | P=1.0000 R=1.0000 F1=1.0000 | pred=7 gold=7
+[USE ] index=281 | question=How tall is Claudia Schiffer? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=282 | question=how much is the population densty rank of germany? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=283 | question=What is the highest mountain in Italy? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=284 | question=List all games by GMT. | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=11
+[USE ] index=285 | question=What is the official language of Suriname? | P=0.0000 R=0.0000 F1=0.0000 | pred=1 gold=1
+[SKIP] index=286 | question=In which city did Nikos Kazantzakis die? | reason=gold_values is empty
+[USE ] index=287 | question=What is in a chocolate chip cookie? | P=1.0000 R=1.0000 F1=1.0000 | pred=10 gold=10
+[USE ] index=288 | question=In which country is the Limerick Lake? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=289 | question=Give me all video games published by Mean Hamster Software. | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=290 | question=Give me all members of Prodigy. | P=1.0000 R=1.0000 F1=1.0000 | pred=2 gold=2
+[USE ] index=291 | question=In which time zone is Rome? | P=1.0000 R=1.0000 F1=1.0000 | pred=2 gold=2
+[USE ] index=292 | question=How high is the lighthouse in Colombo? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=293 | question=Who are the writers of the Wall album of Pink Floyd? | P=1.0000 R=1.0000 F1=1.0000 | pred=4 gold=4
+[SKIP] index=294 | question=Who is the mayor of Rotterdam? | reason=gold_values is empty
+[USE ] index=295 | question=What is the largest city in Australia? | P=1.0000 R=0.5000 F1=0.6667 | pred=1 gold=2
+[USE ] index=296 | question=Who was married to president Chirac? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=297 | question=What form of government is found in South Africa? | P=0.0000 R=0.0000 F1=0.0000 | pred=1 gold=1
+[USE ] index=298 | question=How high is the Yokohama Marine Tower? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=299 | question=Which holidays are celebrated around the world? | P=1.0000 R=1.0000 F1=1.0000 | pred=2219 gold=2219
+[USE ] index=300 | question=Who is the tallest basketball player? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=301 | question=How many languages are spoken in Turkmenistan? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=302 | question=Did Che Guevara have children? | reason=gold_values is empty
+[SKIP] index=303 | question=Did Kaurismäki ever win the Grand Prix at Cannes? | reason=gold_values is empty
+[USE ] index=304 | question=To which party does the mayor of Paris belong? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=305 | question=Who is the Formula 1 race driver with the most races? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=1
+[SKIP] index=306 | question=What country is Sitecore from? | reason=gold_values is empty
+[USE ] index=307 | question=Give me the birth place of Frank Sinatra. | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=308 | question=Is Christian Bale starring in Velvet Goldmine? | reason=gold_values is empty
+[SKIP] index=309 | question=Who is the son of Sonny and Cher? | reason=gold_values is empty
+[USE ] index=310 | question=How many ethnic groups live in Slovenia? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=1
+[USE ] index=311 | question=What is the capital of Cameroon? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=312 | question=Was Natalie Portman born in the United States? | reason=gold_values is empty
+[USE ] index=313 | question=How many pages does War and Peace have? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=314 | question=Who is the oldest child of Meryl Streep? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=315 | question=Which television shows were created by Walt Disney? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=316 | question=What does IYCM stand for? | P=0.0000 R=0.0000 F1=0.0000 | pred=1 gold=1
+[USE ] index=317 | question=Which types of grapes grow in Oregon? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=85
+[SKIP] index=318 | question=Was U.S. president Jackson involved in a war? | reason=gold_values is empty
+[SKIP] index=319 | question=When was the Titanic completed? | reason=gold_values is empty
+[SKIP] index=320 | question=Did Tesla win a nobel prize in physics? | reason=gold_values is empty
+[USE ] index=321 | question=How many states are in Mexico? | P=0.0000 R=0.0000 F1=0.0000 | pred=1 gold=1
+[SKIP] index=322 | question=Which scientist is known for the Manhattan Project and the Nobel Peace Prize? | reason=gold_values is empty
+[USE ] index=323 | question=How much did the Lego Movie cost? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=324 | question=Who composed the music for Harold and Maude? | reason=gold_values is empty
+[SKIP] index=325 | question=List all episodes of the first season of the HBO television series The Sopranos. | reason=gold_values is empty
+[USE ] index=326 | question=Which city has the least inhabitants? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=327 | question=Where is Syngman Rhee buried? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=328 | question=Does Neymar play for Real Madrid? | reason=gold_values is empty
+[USE ] index=329 | question=Who wrote the book The Pillars of the Earth? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=330 | question=Do Prince Harry and Prince William have the same parents? | reason=gold_values is empty
+[USE ] index=331 | question=Who was the doctoral supervisor of Albert Einstein? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=332 | question=Does Breaking Bad have more episodes than Game of Thrones? | reason=gold_values is empty
+[SKIP] index=333 | question=Who was Vincent van Gogh inspired by? | reason=gold_values is empty
+[SKIP] index=334 | question=Which building after the Burj Khalifa has the most floors? | reason=gold_values is empty
+[USE ] index=335 | question=What was the final result of the War of the Roses? | P=0.0000 R=0.0000 F1=0.0000 | pred=2 gold=1
+[USE ] index=336 | question=How much did Pulp Fiction cost? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=337 | question=Is proinsulin a protein? | reason=gold_values is empty
+[SKIP] index=338 | question=Do Urdu and Persian have a common root? | reason=gold_values is empty
+[USE ] index=339 | question=Who is starring in Spanish movies produced by Benicio del Toro? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=340 | question=Is Lake Baikal bigger than the Great Bear Lake? | reason=gold_values is empty
+[SKIP] index=341 | question=Show me all books in Asimov's Foundation series. | reason=gold_values is empty
+[SKIP] index=342 | question=Where was Bach born? | reason=gold_values is empty
+[USE ] index=343 | question=Which city has the oldest running metro? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=1
+[USE ] index=344 | question=Who designed the Brooklyn Bridge? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=345 | question=How many people live in Eurasia? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=346 | question=Who is the host of the BBC Wildlife Specials? | P=0.0000 R=0.0000 F1=0.0000 | pred=1 gold=1
+[USE ] index=347 | question=What is the total population of Melbourne, Florida? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=1
+[SKIP] index=348 | question=What country is Mount Everest in? | reason=gold_values is empty
+[USE ] index=349 | question=To which artistic movement did the painter of The Three Dancers belong? | P=1.0000 R=1.0000 F1=1.0000 | pred=2 gold=2
+[USE ] index=350 | question=When did Operation Overlord commence? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=351 | question=What is the bridge with the longest span? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=352 | question=Is there a video game called Battle Chess? | reason=gold_values is empty
+[SKIP] index=353 | question=Who was buried in the Great Pyramid of Giza? | reason=gold_values is empty
+[SKIP] index=354 | question=Does the Ford Motor Company have a manufacturing plant in Malaysia? | reason=gold_values is empty
+[SKIP] index=355 | question=Did Socrates influence Aristotle? | reason=gold_values is empty
+[USE ] index=356 | question=How many children did Benjamin Franklin have? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=357 | question=How tall is Michael Jordan? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=358 | question=In which UK city are the headquarters of the MI6? | reason=gold_values is empty
+[USE ] index=359 | question=Who created Family Guy? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=360 | question=In which city does the Chile Route 68 end? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=361 | question=Give me the grandchildren of Elvis Presley. | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=362 | question=When did the Ming dynasty dissolve? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=363 | question=In which military conflicts did Lawrence of Arabia participate? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=6
+[USE ] index=364 | question=What is the timezone in San Pedro de Atacama? | P=0.0000 R=0.0000 F1=0.0000 | pred=7 gold=1
+[USE ] index=365 | question=Give me all books by William Goldman with more than 300 pages. | P=1.0000 R=1.0000 F1=1.0000 | pred=11 gold=11
+[SKIP] index=366 | question=What did Bruce Carver die from? | reason=gold_values is empty
+[SKIP] index=367 | question=Which subsidiary of Lufthansa serves both Dortmund and Berlin Tegel? | reason=gold_values is empty
+[SKIP] index=368 | question=Does Abraham Lincoln's death place have a website? | reason=gold_values is empty
+[SKIP] index=369 | question=Did Elvis Presley have children? | reason=gold_values is empty
+[SKIP] index=370 | question=Is Michelle Obama the wife of Barack Obama? | reason=gold_values is empty
+[SKIP] index=371 | question=In which city does Sylvester Stallone live? | reason=gold_values is empty
+[USE ] index=372 | question=Which books by Kerouac were published by Viking Press? | P=1.0000 R=1.0000 F1=1.0000 | pred=3 gold=3
+[USE ] index=373 | question=Who wrote the song Hotel California? | P=0.0000 R=0.0000 F1=0.0000 | pred=1 gold=3
+[USE ] index=374 | question=What is the capital of Canada? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=375 | question=Who is the mayor of Tel Aviv? | reason=gold_values is empty
+[USE ] index=376 | question=What form of government does Russia have? | P=0.0000 R=0.0000 F1=0.0000 | pred=1 gold=1
+[USE ] index=377 | question=Show me the book that Muhammad Ali wrote. | P=1.0000 R=1.0000 F1=1.0000 | pred=2 gold=2
+[SKIP] index=378 | question=Who was the first to climb Mount Everest? | reason=gold_values is empty
+[USE ] index=379 | question=How many languages are spoken in Colombia? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=380 | question=What is the currency of the Czech Republic? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=381 | question=Where in France is sparkling wine produced? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=382 | question=When did Boris Becker end his active career? | reason=gold_values is empty
+[USE ] index=383 | question=Which movies starring Mickey Rourke were directed by Guy Ritchie? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=384 | question=In which films did Julia Roberts as well as Richard Gere play? | P=1.0000 R=1.0000 F1=1.0000 | pred=2 gold=2
+[SKIP] index=385 | question=Show me Hemingway's autobiography. | reason=gold_values is empty
+[USE ] index=386 | question=How tall is Amazon Eve? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=387 | question=What are the five boroughs of New York? | reason=gold_values is empty
+[USE ] index=388 | question=Give me all Canadian Grunge record labels. | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=389 | question=In which country does the Ganges start? | reason=gold_values is empty
+[SKIP] index=390 | question=Who is the founder of Penguin Books? | reason=gold_values is empty
+[USE ] index=391 | question=Who wrote the Game of Thrones theme? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=392 | question=Who is the president of Eritrea? | reason=gold_values is empty
+[USE ] index=393 | question=In which city did John F. Kennedy die? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=394 | question=What is the highest mountain in Australia? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[USE ] index=395 | question=Who writes the Farmers' Almanac? | P=0.0000 R=0.0000 F1=0.0000 | pred=13 gold=2
+[USE ] index=396 | question=Give me the currency of China. | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=397 | question=Give me all Swedish oceanographers. | reason=gold_values is empty
+[USE ] index=398 | question=In which city are the headquarters of the United Nations? | P=0.0000 R=0.0000 F1=0.0000 | pred=0 gold=1
+[SKIP] index=399 | question=Is Rita Wilson the wife of Tom Hanks? | reason=gold_values is empty
+[USE ] index=400 | question=In which countries do people speak Japanese? | P=1.0000 R=1.0000 F1=1.0000 | pred=5 gold=5
+[USE ] index=401 | question=Which of Tim Burton's films had the highest budget? | P=0.0000 R=0.0000 F1=0.0000 | pred=1 gold=1
+[USE ] index=402 | question=Which museum in New York has the most visitors? | P=1.0000 R=1.0000 F1=1.0000 | pred=1 gold=1
+[SKIP] index=403 | question=What was the first Queen album? | reason=gold_values is empty
+[USE ] index=404 | question=What was the first name of the band Queens of the Stone Age? | P=0.0000 R=0.0000 F1=0.0000 | pred=13 gold=1
+[USE ] index=405 | question=What was the last movie with Alec Guinness? | P=0.0000 R=0.0000 F1=0.0000 | pred=13 gold=1
+[USE ] index=406 | question=Give me all actors starring in Last Action Hero. | P=1.0000 R=1.0000 F1=1.0000 | pred=10 gold=10
+[USE ] index=407 | question=Who discovered Pluto? | P=0.0000 R=0.0000 F1=0.0000 | pred=13 gold=1
+
+===== SUMMARY =====
+Total questions in file: 408
+Included questions: 282
+Skipped questions: 126
+Macro Precision: 0.684306
+Macro Recall:    0.674159
+Macro F1:        0.673993
