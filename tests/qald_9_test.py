@@ -8,6 +8,7 @@ sparql_endpoint = "https://dbpedia.org/sparql"
 INPUT_FILE = "qald_9_plus_train_dbpedia_en.json"
 OUTPUT_FILE = "qald_9_sparql_results.json"
 ERROR_FILE = "qald_9_f1_less_than_1.json"
+LANGUAGE = "en"
 
 # Load QALD questions
 with open(INPUT_FILE, "r", encoding="utf-8") as f:
@@ -27,14 +28,13 @@ running_fp = 0
 running_fn = 0
 
 
-def extract_question(q):
-    """Get English question text."""
+def extract_question(q, language="en"):
     if isinstance(q, str):
         return q
 
     if isinstance(q, list):
         for item in q:
-            if item.get("language") == "en":
+            if item.get("language") == language:
                 return item.get("string")
 
     if isinstance(q, dict):
@@ -122,7 +122,7 @@ def compute_running_scores(tp, fp, fn):
 
 for i, item in enumerate(questions_data):
 
-    question_text = extract_question(item.get("question"))
+    question_text = extract_question(item.get("question"), LANGUAGE)
     gold_query = extract_gold_sparql(item)
 
     print(f"\n[{i + 1}/{len(questions_data)}] {question_text}")

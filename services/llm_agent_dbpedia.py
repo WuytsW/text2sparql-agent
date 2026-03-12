@@ -234,10 +234,10 @@ class LLMAgentDBpedia:
 
                 example += f"""
 
-        Input: {question}
-        Output: {sparql}
+                                Input: {question}
+                                Output: {sparql}
 
-        """
+                                """
                 
                 example += "--- End example ---"
 

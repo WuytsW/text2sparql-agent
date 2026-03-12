@@ -1,0 +1,334 @@
+[
+    {
+        "index": 1,
+        "id": "1",
+        "question": "Перерахуйте всі ігри GMT.",
+        "generated_query": "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\nPREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\nPREFIX foaf: <http://xmlns.com/foaf/0.1/>\nPREFIX schema: <http://schema.org/>\nPREFIX skos: <http://www.w3.org/2004/02/skos/core#>\nPREFIX xsd: <http://www.w3.org/2001/XMLSchema#>\nPREFIX pv: <http://ld.company.org/prod-vocab/>\nPREFIX ecc: <https://ns.eccenca.com/>\nPREFIX void: <http://rdfs.org/ns/void#>\nPREFIX vann: <http://purl.org/vocab/vann/>\nPREFIX dbp: <http://dbpedia.org/property/>\nPREFIX dbr: <http://dbpedia.org/resource/>\nPREFIX dbo: <http://dbpedia.org/ontology/>\nPREFIX res: <http://dbpedia.org/resource/>\n\nSELECT ?uri WHERE {\n    ?uri a dbo:Game ; \n         dbo:publisher res:GMT_Games .\n}",
+        "generated_result": {
+            "head": {
+                "link": [],
+                "vars": [
+                    "uri"
+                ]
+            },
+            "results": {
+                "distinct": false,
+                "ordered": true,
+                "bindings": [
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Commands_&_Colors:_Ancients"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Commands_&_Colors:_Ancients"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Commands_&_Colors:_Ancients"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Space_Empires_4X"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Space_Empires_4X"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Space_Empires_4X"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Fields_of_Fire_(game)"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Fields_of_Fire_(game)"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Fields_of_Fire_(game)"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Labyrinth:_The_War_on_Terror,_2001_–_%3F"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Labyrinth:_The_War_on_Terror,_2001_–_%3F"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Labyrinth:_The_War_on_Terror,_2001_–_%3F"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Sword_of_Rome"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Sword_of_Rome"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Sword_of_Rome"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/1989:_Dawn_of_Freedom"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/1989:_Dawn_of_Freedom"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/SPQR_(board_game)"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/SPQR_(board_game)"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Twilight_Struggle"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Twilight_Struggle"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Twilight_Struggle"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Paths_of_Glory_(board_game)"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Paths_of_Glory_(board_game)"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Paths_of_Glory_(board_game)"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Washington's_War"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Washington's_War"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Washington's_War"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Chandragupta_(board_game)"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Chandragupta_(board_game)"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Chandragupta_(board_game)"
+                        }
+                    }
+                ]
+            }
+        },
+        "generated_execution_error": null,
+        "gold_query": "PREFIX dbo: <http://dbpedia.org/ontology/> PREFIX res: <http://dbpedia.org/resource/> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> SELECT ?uri WHERE { ?uri dbo:publisher res:GMT_Games }",
+        "gold_result": {
+            "head": {
+                "link": [],
+                "vars": [
+                    "uri"
+                ]
+            },
+            "results": {
+                "distinct": false,
+                "ordered": true,
+                "bindings": [
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Commands_&_Colors:_Ancients"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Space_Empires_4X"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Fields_of_Fire_(game)"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Labyrinth:_The_War_on_Terror,_2001_–_%3F"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Sword_of_Rome"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/1989:_Dawn_of_Freedom"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/SPQR_(board_game)"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Twilight_Struggle"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Paths_of_Glory_(board_game)"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Washington's_War"
+                        }
+                    },
+                    {
+                        "uri": {
+                            "type": "uri",
+                            "value": "http://dbpedia.org/resource/Chandragupta_(board_game)"
+                        }
+                    }
+                ]
+            }
+        },
+        "gold_execution_error": null,
+        "tp": 11,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "running_tp": 11,
+        "running_fp": 0,
+        "running_fn": 0,
+        "running_micro_precision": 1.0,
+        "running_micro_recall": 1.0,
+        "running_micro_f1": 1.0,
+        "running_macro_precision": 1.0,
+        "running_macro_recall": 1.0,
+        "running_macro_f1": 1.0,
+        "generated_values": [
+            "uri=http://dbpedia.org/resource/1989:_Dawn_of_Freedom",
+            "uri=http://dbpedia.org/resource/Chandragupta_(board_game)",
+            "uri=http://dbpedia.org/resource/Commands_&_Colors:_Ancients",
+            "uri=http://dbpedia.org/resource/Fields_of_Fire_(game)",
+            "uri=http://dbpedia.org/resource/Labyrinth:_The_War_on_Terror,_2001_–_%3F",
+            "uri=http://dbpedia.org/resource/Paths_of_Glory_(board_game)",
+            "uri=http://dbpedia.org/resource/SPQR_(board_game)",
+            "uri=http://dbpedia.org/resource/Space_Empires_4X",
+            "uri=http://dbpedia.org/resource/Sword_of_Rome",
+            "uri=http://dbpedia.org/resource/Twilight_Struggle",
+            "uri=http://dbpedia.org/resource/Washington's_War"
+        ],
+        "gold_values": [
+            "uri=http://dbpedia.org/resource/1989:_Dawn_of_Freedom",
+            "uri=http://dbpedia.org/resource/Chandragupta_(board_game)",
+            "uri=http://dbpedia.org/resource/Commands_&_Colors:_Ancients",
+            "uri=http://dbpedia.org/resource/Fields_of_Fire_(game)",
+            "uri=http://dbpedia.org/resource/Labyrinth:_The_War_on_Terror,_2001_–_%3F",
+            "uri=http://dbpedia.org/resource/Paths_of_Glory_(board_game)",
+            "uri=http://dbpedia.org/resource/SPQR_(board_game)",
+            "uri=http://dbpedia.org/resource/Space_Empires_4X",
+            "uri=http://dbpedia.org/resource/Sword_of_Rome",
+            "uri=http://dbpedia.org/resource/Twilight_Struggle",
+            "uri=http://dbpedia.org/resource/Washington's_War"
+        ],
+        "only_in_generated": [],
+        "only_in_gold": []
+    }
+]

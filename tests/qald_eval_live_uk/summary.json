@@ -1,0 +1,17 @@
+{
+    "total_questions": 408,
+    "processed_questions": 1,
+    "remaining_questions": 407,
+    "final_tp_so_far": 11,
+    "final_fp_so_far": 0,
+    "final_fn_so_far": 0,
+    "micro_precision_so_far": 1.0,
+    "micro_recall_so_far": 1.0,
+    "micro_f1_so_far": 1.0,
+    "macro_precision_so_far": 1.0,
+    "macro_recall_so_far": 1.0,
+    "macro_f1_so_far": 1.0,
+    "questions_with_f1_less_than_1": 0,
+    "elapsed_seconds": 25.20774793624878,
+    "done": false
+}
