@@ -1,6 +1,7 @@
 from langsmith import Client
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, AIMessage
+from langchain_core.callbacks import BaseCallbackHandler
 from langgraph.graph import StateGraph, END
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -13,6 +14,7 @@ from typing import List
 import os
 import json
 import logging
+from datetime import datetime
 
 from services.llm_utils import dbpedia_el, Plan, get_expected_answer_type
 from services.ld_utils import execute, post_process
@@ -23,6 +25,69 @@ from prompts.dbpedia import (
     planner_prompt_dct,
     feedback_step_dict
 )
+
+BLACK   = "\033[30m"
+RED     = "\033[31m"
+GREEN   = "\033[32m"
+YELLOW  = "\033[33m"
+BLUE    = "\033[34m"
+MAGENTA = "\033[35m"
+CYAN    = "\033[36m"
+WHITE   = "\033[37m"
+
+RESET   = "\033[0m"
+
+logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
+logging.getLogger().setLevel(logging.INFO)
+
+
+
+class LogLLMCallbackHandler(BaseCallbackHandler):
+    def __init__(self):
+        super().__init__()
+        self.call_count = 0
+        self._log_entries = []
+
+    def reset(self, question: str):
+        self.call_count = 0
+        self._log_entries = []
+        self._question = question
+        self._start_time = datetime.now().isoformat()
+
+    def _flush_to_file(self, sparql: str, log_path: str = "logs/llm_calls.json"):
+        record = {
+            "time": self._start_time,
+            "question": self._question,
+            "total_llm_calls": self.call_count,
+            "sparql": sparql,
+            "calls": self._log_entries,
+        }
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        existing = []
+        if os.path.exists(log_path):
+            with open(log_path, "r", encoding="utf-8") as f:
+                try:
+                    existing = json.load(f)
+                except json.JSONDecodeError:
+                    existing = []
+        existing.append(record)
+        with open(log_path, "w", encoding="utf-8") as f:
+            json.dump(existing, f, indent=2, ensure_ascii=False)
+
+    def on_chat_model_start(self, serialized, _messages, **kwargs):
+        self.call_count += 1
+        model = serialized.get("kwargs", {}).get("model_name", "unknown")
+        msgs = [[{"type": m.type, "content": m.content} for m in grp] for grp in _messages]
+        self._log_entries.append({"call": self.call_count, "model": model, "messages": msgs})
+        logging.info(f"{BLUE}[LLM API call #{self.call_count}] model={model} \n messages={_messages}{RESET}")
+
+    def on_llm_end(self, response, **kwargs):
+        gen = response.generations[0][0]
+        text = gen.text or (gen.message.content if hasattr(gen, "message") else "")
+        if text:
+            if self._log_entries:
+                self._log_entries[-1]["response"] = text
+            logging.info(f"{GREEN}[LLM response #{self.call_count}]:\n{text}{RESET}")
 
 
 class LLMAgentDBpedia:
@@ -71,14 +136,17 @@ class LLMAgentDBpedia:
 
         ### START Initialize agent
         self.tools = tools
+        self.llm_callback = LogLLMCallbackHandler()
+
         self.plan_llm = ChatOpenAI(
             model=model_name,
             temperature=0,
             api_key=os.getenv("OPENROUTER_API_KEY"),
             base_url="https://openrouter.ai/api/v1",
+            callbacks=[self.llm_callback],
         ).with_structured_output(Plan)
 
-        
+
         client = Client()
         prompt = client.pull_prompt("hwchase17/openai-functions-agent")
 
@@ -87,13 +155,14 @@ class LLMAgentDBpedia:
             model=model_name,
             api_key=os.getenv("OPENROUTER_API_KEY"),
             base_url="https://openrouter.ai/api/v1",
+            callbacks=[self.llm_callback],
         )
 
         # Construct the OpenAI Functions agent
         self.agent_runnable = create_tool_calling_agent(self.llm, tools, prompt)
 
         self.agent_executor = AgentExecutor(
-            agent=self.agent_runnable, tools=tools, verbose=True, return_intermediate_steps=True
+            agent=self.agent_runnable, tools=tools, verbose=False, return_intermediate_steps=True
         )
 
         self.app = None
@@ -103,7 +172,7 @@ class LLMAgentDBpedia:
     def _plan_step(self, state: PlanExecute):
         try:
             plan = self.plan_llm.invoke(planner_prompt_dct[self.lang].format(objective=state["input"]))
-            logging.info(f"Generated plan: {plan.steps}")
+            logging.info(f"{MAGENTA}[plan_step] Generated plan: {plan.steps}{RESET}")
             return {"plan": plan.steps + [last_task]}
 
         except Exception as e:
@@ -220,6 +289,8 @@ class LLMAgentDBpedia:
             A SPARQL query string
         """
         try:
+            self.llm_callback.reset(input_question)
+
             if self.app is None:
                 self._init_workflow()
 
@@ -249,6 +320,8 @@ class LLMAgentDBpedia:
         
             sparql_result = agent_result['chat_history'][-1].content
 
+            logging.info(f"{CYAN}[Total LLM calls]: {self.llm_callback.call_count}{RESET}")
+            self.llm_callback._flush_to_file(sparql_result)
             logging.info(f"Generated SPARQL query: {sparql_result}")
 
             generated_query = post_process(sparql_result)

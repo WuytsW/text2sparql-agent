@@ -24,7 +24,6 @@ from prompts.corporate import (
     feedback_step_dict
 )
 
-
 class LLMAgentCorporate:
     """
     Implementation of an LLM agent that converts natural language to SPARQL over corporate Eccenca knowledge graph.

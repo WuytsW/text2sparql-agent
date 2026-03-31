@@ -1,0 +1,708 @@
+[
+  {
+    "time": "2026-03-31T12:11:14.888321",
+    "question": "Which people were born in Heraklion?",
+    "total_llm_calls": 10,
+    "sparql": "PREFIX dbo: <http://dbpedia.org/ontology/>\nSELECT ?uri WHERE { \n    ?uri dbo:birthPlace <http://dbpedia.org/resource/Heraklion> \n}",
+    "calls": [
+      {
+        "call": 1,
+        "model": "openai/gpt-4o-mini",
+        "messages": [
+          [
+            {
+              "type": "human",
+              "content": "For the given objective, come up with a simple step by step plan to write a SPARQL query. \nThis plan should involve individual tasks (e.g., **named entity linking**, **relation linking**), that if executed correctly will yield the correct SPARQL.\nDo not add any superfluous steps.\nBe very specific when defining the steps e.g.,: \"Link the following named entities: Name Surname, ...\"\nThe result of the final step should be the final SPARQL query over DBpedia. Don't propose to execute the query.\nAt the end step you MUST output exactly **ONE** SPARQL query over DBpedia string **without extra text or markdown**.\n\nObjective: Which people were born in Heraklion?\n\nFormatting instructions:\nJust output the valid JSON with the list of strings as follows: {\"plan\": [\"step1\", \"step2\", ...]} Put every step to the list\nOnly output VALID JSON without escape chars: {\"plan\": [\"step1\", \"step2\", ...]}\nMake sure that the output is VALID JSON"
+            }
+          ]
+        ],
+        "response": "{\"steps\":[\"Identify the named entity: Heraklion\",\"Determine the relevant property for birth location: dbo:birthPlace\",\"Identify the class of entities to query: dbo:Person\",\"Construct the SPARQL query structure: SELECT ?person WHERE { ?person dbo:birthPlace <http://dbpedia.org/resource/Heraklion> }\",\"Finalize the SPARQL query\"]}"
+      },
+      {
+        "call": 2,
+        "model": "openai/gpt-4o-mini",
+        "messages": [
+          [
+            {
+              "type": "system",
+              "content": "You are a Expected Answer Type Tool.\n    Recognize named the expected answer type of the given question and output as RDF datatype and your confidence score.\n    **Output ONLY the structured data.**\n    Below is a text for you to analyze."
+            },
+            {
+              "type": "human",
+              "content": "Show me the birthday of Friedrich Schiller"
+            },
+            {
+              "type": "ai",
+              "content": "{'question': 'Show me the birthday of Friedrich Schiller', 'expected_answer_type': {'eat': 'http://www.w3.org/2001/XMLSchema#date', 'confidence': 0.95}}"
+            },
+            {
+              "type": "human",
+              "content": "What is the capital of Germany?"
+            },
+            {
+              "type": "ai",
+              "content": "{'question': 'What is the capital of Germany?', 'expected_answer_type': {'eat': 'http://www.w3.org/2000/01/rdf-schema#Resource', 'confidence': 0.95}}"
+            },
+            {
+              "type": "human",
+              "content": "What is the population of Berlin?"
+            },
+            {
+              "type": "ai",
+              "content": "{'question': 'What is the population of Berlin?', 'expected_answer_type': {'eat': 'http://www.w3.org/2001/XMLSchema#integer', 'confidence': 0.95}}"
+            },
+            {
+              "type": "human",
+              "content": "Which people were born in Heraklion?"
+            }
+          ]
+        ],
+        "response": "{'question': 'Which people were born in Heraklion?', 'expected_answer_type': {'eat': 'http://www.w3.org/2000/01/rdf-schema#Resource', 'confidence': 0.90}}"
+      },
+      {
+        "call": 3,
+        "model": "openai/gpt-4o-mini",
+        "messages": [
+          [
+            {
+              "type": "system",
+              "content": "You are a helpful assistant"
+            },
+            {
+              "type": "system",
+              "content": "You are an intelligent Knowledge Graph-based Question Answering system.      \n                --- Successful example for in context learning ---\n\n                                Input: Which people were born in Heraklion?\n                                Output: PREFIX yago: <http://dbpedia.org/class/yago/> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX onto: <http://dbpedia.org/ontology/> SELECT DISTINCT ?uri WHERE { ?uri rdf:type onto:Person ; onto:birthPlace <http://dbpedia.org/resource/Heraklion>. }\n\n                                --- End example ---\n\n                                Input: Which actors were born in Germany?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> { ?uri <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Germany> } UNION { ?uri <http://dbpedia.org/ontology/birthPlace> ?place . ?place <http://dbpedia.org/ontology/country> <http://dbpedia.org/resource/Germany> } }\n\n                                --- End example ---\n\n                                Input: Which Chess players died in the same place they were born in?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/ChessPlayer> ; <http://dbpedia.org/ontology/birthPlace> ?x ; <http://dbpedia.org/ontology/deathPlace> ?y FILTER ( ?x = ?y ) }\n\n                                --- End example ---\n\n                                Input: Which soccer players were born on Malta?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/SoccerPlayer> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Malta> }\n\n                                --- End example ---\n\n                                Input: Give me all actors who were born in Berlin.\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Berlin> }\n\n                                --- End example ---"
+            },
+            {
+              "type": "ai",
+              "content": "http://www.w3.org/2000/01/rdf-schema#Resource"
+            },
+            {
+              "type": "human",
+              "content": "Identify the named entity: Heraklion"
+            }
+          ]
+        ]
+      },
+      {
+        "call": 4,
+        "model": "openai/gpt-4o-mini",
+        "messages": [
+          [
+            {
+              "type": "system",
+              "content": "You are a helpful assistant"
+            },
+            {
+              "type": "system",
+              "content": "You are an intelligent Knowledge Graph-based Question Answering system.      \n                --- Successful example for in context learning ---\n\n                                Input: Which people were born in Heraklion?\n                                Output: PREFIX yago: <http://dbpedia.org/class/yago/> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX onto: <http://dbpedia.org/ontology/> SELECT DISTINCT ?uri WHERE { ?uri rdf:type onto:Person ; onto:birthPlace <http://dbpedia.org/resource/Heraklion>. }\n\n                                --- End example ---\n\n                                Input: Which actors were born in Germany?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> { ?uri <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Germany> } UNION { ?uri <http://dbpedia.org/ontology/birthPlace> ?place . ?place <http://dbpedia.org/ontology/country> <http://dbpedia.org/resource/Germany> } }\n\n                                --- End example ---\n\n                                Input: Which Chess players died in the same place they were born in?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/ChessPlayer> ; <http://dbpedia.org/ontology/birthPlace> ?x ; <http://dbpedia.org/ontology/deathPlace> ?y FILTER ( ?x = ?y ) }\n\n                                --- End example ---\n\n                                Input: Which soccer players were born on Malta?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/SoccerPlayer> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Malta> }\n\n                                --- End example ---\n\n                                Input: Give me all actors who were born in Berlin.\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Berlin> }\n\n                                --- End example ---"
+            },
+            {
+              "type": "ai",
+              "content": "http://www.w3.org/2000/01/rdf-schema#Resource"
+            },
+            {
+              "type": "human",
+              "content": "Identify the named entity: Heraklion"
+            },
+            {
+              "type": "AIMessageChunk",
+              "content": ""
+            },
+            {
+              "type": "tool",
+              "content": "[{\"URI\": \"http://dbpedia.org/resource/Rodia,_Heraklion\", \"surface form\": \"Heraklion\"}]"
+            }
+          ]
+        ],
+        "response": "The named entity \"Heraklion\" is identified with the URI: [http://dbpedia.org/resource/Rodia,_Heraklion](http://dbpedia.org/resource/Rodia,_Heraklion)."
+      },
+      {
+        "call": 5,
+        "model": "openai/gpt-4o-mini",
+        "messages": [
+          [
+            {
+              "type": "system",
+              "content": "You are a helpful assistant"
+            },
+            {
+              "type": "system",
+              "content": "You are an intelligent Knowledge Graph-based Question Answering system.      \n                --- Successful example for in context learning ---\n\n                                Input: Which people were born in Heraklion?\n                                Output: PREFIX yago: <http://dbpedia.org/class/yago/> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX onto: <http://dbpedia.org/ontology/> SELECT DISTINCT ?uri WHERE { ?uri rdf:type onto:Person ; onto:birthPlace <http://dbpedia.org/resource/Heraklion>. }\n\n                                --- End example ---\n\n                                Input: Which actors were born in Germany?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> { ?uri <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Germany> } UNION { ?uri <http://dbpedia.org/ontology/birthPlace> ?place . ?place <http://dbpedia.org/ontology/country> <http://dbpedia.org/resource/Germany> } }\n\n                                --- End example ---\n\n                                Input: Which Chess players died in the same place they were born in?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/ChessPlayer> ; <http://dbpedia.org/ontology/birthPlace> ?x ; <http://dbpedia.org/ontology/deathPlace> ?y FILTER ( ?x = ?y ) }\n\n                                --- End example ---\n\n                                Input: Which soccer players were born on Malta?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/SoccerPlayer> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Malta> }\n\n                                --- End example ---\n\n                                Input: Give me all actors who were born in Berlin.\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Berlin> }\n\n                                --- End example ---"
+            },
+            {
+              "type": "ai",
+              "content": "http://www.w3.org/2000/01/rdf-schema#Resource"
+            },
+            {
+              "type": "ai",
+              "content": "The named entity \"Heraklion\" is identified with the URI: [http://dbpedia.org/resource/Rodia,_Heraklion](http://dbpedia.org/resource/Rodia,_Heraklion)."
+            },
+            {
+              "type": "human",
+              "content": "Determine the relevant property for birth location: dbo:birthPlace"
+            }
+          ]
+        ],
+        "response": "The relevant property for birth location in the DBpedia ontology is `dbo:birthPlace`."
+      },
+      {
+        "call": 6,
+        "model": "openai/gpt-4o-mini",
+        "messages": [
+          [
+            {
+              "type": "system",
+              "content": "You are a helpful assistant"
+            },
+            {
+              "type": "system",
+              "content": "You are an intelligent Knowledge Graph-based Question Answering system.      \n                --- Successful example for in context learning ---\n\n                                Input: Which people were born in Heraklion?\n                                Output: PREFIX yago: <http://dbpedia.org/class/yago/> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX onto: <http://dbpedia.org/ontology/> SELECT DISTINCT ?uri WHERE { ?uri rdf:type onto:Person ; onto:birthPlace <http://dbpedia.org/resource/Heraklion>. }\n\n                                --- End example ---\n\n                                Input: Which actors were born in Germany?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> { ?uri <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Germany> } UNION { ?uri <http://dbpedia.org/ontology/birthPlace> ?place . ?place <http://dbpedia.org/ontology/country> <http://dbpedia.org/resource/Germany> } }\n\n                                --- End example ---\n\n                                Input: Which Chess players died in the same place they were born in?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/ChessPlayer> ; <http://dbpedia.org/ontology/birthPlace> ?x ; <http://dbpedia.org/ontology/deathPlace> ?y FILTER ( ?x = ?y ) }\n\n                                --- End example ---\n\n                                Input: Which soccer players were born on Malta?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/SoccerPlayer> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Malta> }\n\n                                --- End example ---\n\n                                Input: Give me all actors who were born in Berlin.\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Berlin> }\n\n                                --- End example ---"
+            },
+            {
+              "type": "ai",
+              "content": "http://www.w3.org/2000/01/rdf-schema#Resource"
+            },
+            {
+              "type": "ai",
+              "content": "The named entity \"Heraklion\" is identified with the URI: [http://dbpedia.org/resource/Rodia,_Heraklion](http://dbpedia.org/resource/Rodia,_Heraklion)."
+            },
+            {
+              "type": "ai",
+              "content": "The relevant property for birth location in the DBpedia ontology is `dbo:birthPlace`."
+            },
+            {
+              "type": "human",
+              "content": "Identify the class of entities to query: dbo:Person"
+            }
+          ]
+        ],
+        "response": "To query for people, the class of entities is `dbo:Person`."
+      },
+      {
+        "call": 7,
+        "model": "openai/gpt-4o-mini",
+        "messages": [
+          [
+            {
+              "type": "system",
+              "content": "You are a helpful assistant"
+            },
+            {
+              "type": "system",
+              "content": "You are an intelligent Knowledge Graph-based Question Answering system.      \n                --- Successful example for in context learning ---\n\n                                Input: Which people were born in Heraklion?\n                                Output: PREFIX yago: <http://dbpedia.org/class/yago/> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX onto: <http://dbpedia.org/ontology/> SELECT DISTINCT ?uri WHERE { ?uri rdf:type onto:Person ; onto:birthPlace <http://dbpedia.org/resource/Heraklion>. }\n\n                                --- End example ---\n\n                                Input: Which actors were born in Germany?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> { ?uri <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Germany> } UNION { ?uri <http://dbpedia.org/ontology/birthPlace> ?place . ?place <http://dbpedia.org/ontology/country> <http://dbpedia.org/resource/Germany> } }\n\n                                --- End example ---\n\n                                Input: Which Chess players died in the same place they were born in?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/ChessPlayer> ; <http://dbpedia.org/ontology/birthPlace> ?x ; <http://dbpedia.org/ontology/deathPlace> ?y FILTER ( ?x = ?y ) }\n\n                                --- End example ---\n\n                                Input: Which soccer players were born on Malta?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/SoccerPlayer> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Malta> }\n\n                                --- End example ---\n\n                                Input: Give me all actors who were born in Berlin.\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Berlin> }\n\n                                --- End example ---"
+            },
+            {
+              "type": "ai",
+              "content": "http://www.w3.org/2000/01/rdf-schema#Resource"
+            },
+            {
+              "type": "ai",
+              "content": "The named entity \"Heraklion\" is identified with the URI: [http://dbpedia.org/resource/Rodia,_Heraklion](http://dbpedia.org/resource/Rodia,_Heraklion)."
+            },
+            {
+              "type": "ai",
+              "content": "The relevant property for birth location in the DBpedia ontology is `dbo:birthPlace`."
+            },
+            {
+              "type": "ai",
+              "content": "To query for people, the class of entities is `dbo:Person`."
+            },
+            {
+              "type": "human",
+              "content": "Construct the SPARQL query structure: SELECT ?person WHERE { ?person dbo:birthPlace <http://dbpedia.org/resource/Heraklion> }"
+            }
+          ]
+        ],
+        "response": "```sparql\nSELECT ?person WHERE { \n    ?person dbo:birthPlace <http://dbpedia.org/resource/Heraklion> \n}\n```"
+      },
+      {
+        "call": 8,
+        "model": "openai/gpt-4o-mini",
+        "messages": [
+          [
+            {
+              "type": "system",
+              "content": "You are a helpful assistant"
+            },
+            {
+              "type": "system",
+              "content": "You are an intelligent Knowledge Graph-based Question Answering system.      \n                --- Successful example for in context learning ---\n\n                                Input: Which people were born in Heraklion?\n                                Output: PREFIX yago: <http://dbpedia.org/class/yago/> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX onto: <http://dbpedia.org/ontology/> SELECT DISTINCT ?uri WHERE { ?uri rdf:type onto:Person ; onto:birthPlace <http://dbpedia.org/resource/Heraklion>. }\n\n                                --- End example ---\n\n                                Input: Which actors were born in Germany?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> { ?uri <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Germany> } UNION { ?uri <http://dbpedia.org/ontology/birthPlace> ?place . ?place <http://dbpedia.org/ontology/country> <http://dbpedia.org/resource/Germany> } }\n\n                                --- End example ---\n\n                                Input: Which Chess players died in the same place they were born in?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/ChessPlayer> ; <http://dbpedia.org/ontology/birthPlace> ?x ; <http://dbpedia.org/ontology/deathPlace> ?y FILTER ( ?x = ?y ) }\n\n                                --- End example ---\n\n                                Input: Which soccer players were born on Malta?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/SoccerPlayer> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Malta> }\n\n                                --- End example ---\n\n                                Input: Give me all actors who were born in Berlin.\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Berlin> }\n\n                                --- End example ---"
+            },
+            {
+              "type": "ai",
+              "content": "http://www.w3.org/2000/01/rdf-schema#Resource"
+            },
+            {
+              "type": "ai",
+              "content": "The named entity \"Heraklion\" is identified with the URI: [http://dbpedia.org/resource/Rodia,_Heraklion](http://dbpedia.org/resource/Rodia,_Heraklion)."
+            },
+            {
+              "type": "ai",
+              "content": "The relevant property for birth location in the DBpedia ontology is `dbo:birthPlace`."
+            },
+            {
+              "type": "ai",
+              "content": "To query for people, the class of entities is `dbo:Person`."
+            },
+            {
+              "type": "ai",
+              "content": "```sparql\nSELECT ?person WHERE { \n    ?person dbo:birthPlace <http://dbpedia.org/resource/Heraklion> \n}\n```"
+            },
+            {
+              "type": "human",
+              "content": "Finalize the SPARQL query"
+            }
+          ]
+        ],
+        "response": "Here is the finalized SPARQL query to find all people born in Heraklion:\n\n```sparql\nPREFIX dbo: <http://dbpedia.org/ontology/>\nSELECT DISTINCT ?person WHERE { \n    ?person dbo:birthPlace <http://dbpedia.org/resource/Heraklion> \n}\n```"
+      },
+      {
+        "call": 9,
+        "model": "openai/gpt-4o-mini",
+        "messages": [
+          [
+            {
+              "type": "system",
+              "content": "You are a helpful assistant"
+            },
+            {
+              "type": "system",
+              "content": "You are an intelligent Knowledge Graph-based Question Answering system.      \n                --- Successful example for in context learning ---\n\n                                Input: Which people were born in Heraklion?\n                                Output: PREFIX yago: <http://dbpedia.org/class/yago/> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX onto: <http://dbpedia.org/ontology/> SELECT DISTINCT ?uri WHERE { ?uri rdf:type onto:Person ; onto:birthPlace <http://dbpedia.org/resource/Heraklion>. }\n\n                                --- End example ---\n\n                                Input: Which actors were born in Germany?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> { ?uri <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Germany> } UNION { ?uri <http://dbpedia.org/ontology/birthPlace> ?place . ?place <http://dbpedia.org/ontology/country> <http://dbpedia.org/resource/Germany> } }\n\n                                --- End example ---\n\n                                Input: Which Chess players died in the same place they were born in?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/ChessPlayer> ; <http://dbpedia.org/ontology/birthPlace> ?x ; <http://dbpedia.org/ontology/deathPlace> ?y FILTER ( ?x = ?y ) }\n\n                                --- End example ---\n\n                                Input: Which soccer players were born on Malta?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/SoccerPlayer> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Malta> }\n\n                                --- End example ---\n\n                                Input: Give me all actors who were born in Berlin.\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Berlin> }\n\n                                --- End example ---"
+            },
+            {
+              "type": "ai",
+              "content": "http://www.w3.org/2000/01/rdf-schema#Resource"
+            },
+            {
+              "type": "ai",
+              "content": "The named entity \"Heraklion\" is identified with the URI: [http://dbpedia.org/resource/Rodia,_Heraklion](http://dbpedia.org/resource/Rodia,_Heraklion)."
+            },
+            {
+              "type": "ai",
+              "content": "The relevant property for birth location in the DBpedia ontology is `dbo:birthPlace`."
+            },
+            {
+              "type": "ai",
+              "content": "To query for people, the class of entities is `dbo:Person`."
+            },
+            {
+              "type": "ai",
+              "content": "```sparql\nSELECT ?person WHERE { \n    ?person dbo:birthPlace <http://dbpedia.org/resource/Heraklion> \n}\n```"
+            },
+            {
+              "type": "ai",
+              "content": "Here is the finalized SPARQL query to find all people born in Heraklion:\n\n```sparql\nPREFIX dbo: <http://dbpedia.org/ontology/>\nSELECT DISTINCT ?person WHERE { \n    ?person dbo:birthPlace <http://dbpedia.org/resource/Heraklion> \n}\n```"
+            },
+            {
+              "type": "human",
+              "content": "{'en': 'Make sure that the query is formatted correctly. No extra text. No markdown. Just plain SPARQL query.\\nDetermine whether to output a URI (SELECT ?uri), number (COUNT), date, boolean (ASK), string (SELECT ?label)\\nDON\\'T USE \"SERVICE wikibase:label\"\\n'}"
+            }
+          ]
+        ],
+        "response": "PREFIX dbo: <http://dbpedia.org/ontology/>\nSELECT ?uri WHERE { \n    ?uri dbo:birthPlace <http://dbpedia.org/resource/Heraklion> \n}"
+      },
+      {
+        "call": 10,
+        "model": "openai/gpt-4o-mini",
+        "messages": [
+          [
+            {
+              "type": "system",
+              "content": "You are a helpful assistant"
+            },
+            {
+              "type": "system",
+              "content": "You are an intelligent Knowledge Graph-based Question Answering system.      \n                --- Successful example for in context learning ---\n\n                                Input: Which people were born in Heraklion?\n                                Output: PREFIX yago: <http://dbpedia.org/class/yago/> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX onto: <http://dbpedia.org/ontology/> SELECT DISTINCT ?uri WHERE { ?uri rdf:type onto:Person ; onto:birthPlace <http://dbpedia.org/resource/Heraklion>. }\n\n                                --- End example ---\n\n                                Input: Which actors were born in Germany?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> { ?uri <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Germany> } UNION { ?uri <http://dbpedia.org/ontology/birthPlace> ?place . ?place <http://dbpedia.org/ontology/country> <http://dbpedia.org/resource/Germany> } }\n\n                                --- End example ---\n\n                                Input: Which Chess players died in the same place they were born in?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/ChessPlayer> ; <http://dbpedia.org/ontology/birthPlace> ?x ; <http://dbpedia.org/ontology/deathPlace> ?y FILTER ( ?x = ?y ) }\n\n                                --- End example ---\n\n                                Input: Which soccer players were born on Malta?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/SoccerPlayer> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Malta> }\n\n                                --- End example ---\n\n                                Input: Give me all actors who were born in Berlin.\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Berlin> }\n\n                                --- End example ---"
+            },
+            {
+              "type": "ai",
+              "content": "http://www.w3.org/2000/01/rdf-schema#Resource"
+            },
+            {
+              "type": "ai",
+              "content": "The named entity \"Heraklion\" is identified with the URI: [http://dbpedia.org/resource/Rodia,_Heraklion](http://dbpedia.org/resource/Rodia,_Heraklion)."
+            },
+            {
+              "type": "ai",
+              "content": "The relevant property for birth location in the DBpedia ontology is `dbo:birthPlace`."
+            },
+            {
+              "type": "ai",
+              "content": "To query for people, the class of entities is `dbo:Person`."
+            },
+            {
+              "type": "ai",
+              "content": "```sparql\nSELECT ?person WHERE { \n    ?person dbo:birthPlace <http://dbpedia.org/resource/Heraklion> \n}\n```"
+            },
+            {
+              "type": "ai",
+              "content": "Here is the finalized SPARQL query to find all people born in Heraklion:\n\n```sparql\nPREFIX dbo: <http://dbpedia.org/ontology/>\nSELECT DISTINCT ?person WHERE { \n    ?person dbo:birthPlace <http://dbpedia.org/resource/Heraklion> \n}\n```"
+            },
+            {
+              "type": "ai",
+              "content": "PREFIX dbo: <http://dbpedia.org/ontology/>\nSELECT ?uri WHERE { \n    ?uri dbo:birthPlace <http://dbpedia.org/resource/Heraklion> \n}"
+            },
+            {
+              "type": "human",
+              "content": "\n    This is feedback to your generated SPARQL query produced by executing it on a triplestore.\n    Please rework your query if neccessary.\n\n    Initial question: Which people were born in Heraklion?\n    Your query: \n    PREFIX dbo: <http://dbpedia.org/ontology/>\nSELECT ?uri WHERE { \n    ?uri dbo:birthPlace <http://dbpedia.org/resource/Heraklion> \n}\n\n    --- Start triplestore response ---\n    [{\"uri\": {\"type\": \"uri\", \"value\": \"http://dbpedia.org/resource/Titos_Koutentakis\"}}, {\"uri\": {\"type\": \"uri\", \"value\": \"http://dbpedia.org/resource/Markos_Bathas\"}}, {\"uri\": {\"type\": \"uri\", \"value\": \"http://dbpedia.org/resource/Iosif_Daskalakis\"}}]\n    --- End triplestore response ---\n\n    {'en': 'Make sure that the query is formatted correctly. No extra text. No markdown. Just plain SPARQL query.\\nDetermine whether to output a URI (SELECT ?uri), number (COUNT), date, boolean (ASK), string (SELECT ?label)\\nDON\\'T USE \"SERVICE wikibase:label\"\\n'}\n    "
+            }
+          ]
+        ],
+        "response": "PREFIX dbo: <http://dbpedia.org/ontology/>\nSELECT ?uri WHERE { \n    ?uri dbo:birthPlace <http://dbpedia.org/resource/Heraklion> \n}"
+      }
+    ]
+  },
+  {
+    "time": "2026-03-31T12:13:31.979221",
+    "question": "Which people were born in Brussels?",
+    "total_llm_calls": 10,
+    "sparql": "PREFIX dbo: <http://dbpedia.org/ontology/>\nPREFIX dbr: <http://dbpedia.org/resource/>\n\nSELECT DISTINCT ?uri WHERE { \n    ?uri a dbo:Person ; \n    dbo:birthPlace dbr:Brussels . \n}",
+    "calls": [
+      {
+        "call": 1,
+        "model": "openai/gpt-4o-mini",
+        "messages": [
+          [
+            {
+              "type": "human",
+              "content": "For the given objective, come up with a simple step by step plan to write a SPARQL query. \nThis plan should involve individual tasks (e.g., **named entity linking**, **relation linking**), that if executed correctly will yield the correct SPARQL.\nDo not add any superfluous steps.\nBe very specific when defining the steps e.g.,: \"Link the following named entities: Name Surname, ...\"\nThe result of the final step should be the final SPARQL query over DBpedia. Don't propose to execute the query.\nAt the end step you MUST output exactly **ONE** SPARQL query over DBpedia string **without extra text or markdown**.\n\nObjective: Which people were born in Brussels?\n\nFormatting instructions:\nJust output the valid JSON with the list of strings as follows: {\"plan\": [\"step1\", \"step2\", ...]} Put every step to the list\nOnly output VALID JSON without escape chars: {\"plan\": [\"step1\", \"step2\", ...]}\nMake sure that the output is VALID JSON"
+            }
+          ]
+        ],
+        "response": "{\"steps\":[\"Identify the named entity: Brussels\",\"Determine the relevant property for birth location: dbo:birthPlace\",\"Identify the class of entities we are interested in: dbo:Person\",\"Construct the SPARQL query structure: SELECT ?person WHERE { ?person dbo:birthPlace dbr:Brussels . }\",\"Finalize the SPARQL query by ensuring correct prefixes are included: PREFIX dbo: <http://dbpedia.org/ontology/> PREFIX dbr: <http://dbpedia.org/resource/>\"]}"
+      },
+      {
+        "call": 2,
+        "model": "openai/gpt-4o-mini",
+        "messages": [
+          [
+            {
+              "type": "system",
+              "content": "You are a Expected Answer Type Tool.\n    Recognize named the expected answer type of the given question and output as RDF datatype and your confidence score.\n    **Output ONLY the structured data.**\n    Below is a text for you to analyze."
+            },
+            {
+              "type": "human",
+              "content": "Show me the birthday of Friedrich Schiller"
+            },
+            {
+              "type": "ai",
+              "content": "{'question': 'Show me the birthday of Friedrich Schiller', 'expected_answer_type': {'eat': 'http://www.w3.org/2001/XMLSchema#date', 'confidence': 0.95}}"
+            },
+            {
+              "type": "human",
+              "content": "What is the capital of Germany?"
+            },
+            {
+              "type": "ai",
+              "content": "{'question': 'What is the capital of Germany?', 'expected_answer_type': {'eat': 'http://www.w3.org/2000/01/rdf-schema#Resource', 'confidence': 0.95}}"
+            },
+            {
+              "type": "human",
+              "content": "What is the population of Berlin?"
+            },
+            {
+              "type": "ai",
+              "content": "{'question': 'What is the population of Berlin?', 'expected_answer_type': {'eat': 'http://www.w3.org/2001/XMLSchema#integer', 'confidence': 0.95}}"
+            },
+            {
+              "type": "human",
+              "content": "Which people were born in Brussels?"
+            }
+          ]
+        ],
+        "response": "{'question': 'Which people were born in Brussels?', 'expected_answer_type': {'eat': 'http://www.w3.org/2000/01/rdf-schema#Resource', 'confidence': 0.90}}"
+      },
+      {
+        "call": 3,
+        "model": "openai/gpt-4o-mini",
+        "messages": [
+          [
+            {
+              "type": "system",
+              "content": "You are a helpful assistant"
+            },
+            {
+              "type": "system",
+              "content": "You are an intelligent Knowledge Graph-based Question Answering system.      \n                --- Successful example for in context learning ---\n\n                                Input: Which actors were born in Germany?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> { ?uri <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Germany> } UNION { ?uri <http://dbpedia.org/ontology/birthPlace> ?place . ?place <http://dbpedia.org/ontology/country> <http://dbpedia.org/resource/Germany> } }\n\n                                --- End example ---\n\n                                Input: Which people were born in Heraklion?\n                                Output: PREFIX yago: <http://dbpedia.org/class/yago/> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX onto: <http://dbpedia.org/ontology/> SELECT DISTINCT ?uri WHERE { ?uri rdf:type onto:Person ; onto:birthPlace <http://dbpedia.org/resource/Heraklion>. }\n\n                                --- End example ---\n\n                                Input: Which soccer players were born on Malta?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/SoccerPlayer> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Malta> }\n\n                                --- End example ---\n\n                                Input: Give me all actors who were born in Berlin.\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Berlin> }\n\n                                --- End example ---\n\n                                Input: Which Chess players died in the same place they were born in?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/ChessPlayer> ; <http://dbpedia.org/ontology/birthPlace> ?x ; <http://dbpedia.org/ontology/deathPlace> ?y FILTER ( ?x = ?y ) }\n\n                                --- End example ---"
+            },
+            {
+              "type": "ai",
+              "content": "http://www.w3.org/2000/01/rdf-schema#Resource"
+            },
+            {
+              "type": "human",
+              "content": "Identify the named entity: Brussels"
+            }
+          ]
+        ]
+      },
+      {
+        "call": 4,
+        "model": "openai/gpt-4o-mini",
+        "messages": [
+          [
+            {
+              "type": "system",
+              "content": "You are a helpful assistant"
+            },
+            {
+              "type": "system",
+              "content": "You are an intelligent Knowledge Graph-based Question Answering system.      \n                --- Successful example for in context learning ---\n\n                                Input: Which actors were born in Germany?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> { ?uri <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Germany> } UNION { ?uri <http://dbpedia.org/ontology/birthPlace> ?place . ?place <http://dbpedia.org/ontology/country> <http://dbpedia.org/resource/Germany> } }\n\n                                --- End example ---\n\n                                Input: Which people were born in Heraklion?\n                                Output: PREFIX yago: <http://dbpedia.org/class/yago/> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX onto: <http://dbpedia.org/ontology/> SELECT DISTINCT ?uri WHERE { ?uri rdf:type onto:Person ; onto:birthPlace <http://dbpedia.org/resource/Heraklion>. }\n\n                                --- End example ---\n\n                                Input: Which soccer players were born on Malta?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/SoccerPlayer> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Malta> }\n\n                                --- End example ---\n\n                                Input: Give me all actors who were born in Berlin.\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Berlin> }\n\n                                --- End example ---\n\n                                Input: Which Chess players died in the same place they were born in?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/ChessPlayer> ; <http://dbpedia.org/ontology/birthPlace> ?x ; <http://dbpedia.org/ontology/deathPlace> ?y FILTER ( ?x = ?y ) }\n\n                                --- End example ---"
+            },
+            {
+              "type": "ai",
+              "content": "http://www.w3.org/2000/01/rdf-schema#Resource"
+            },
+            {
+              "type": "human",
+              "content": "Identify the named entity: Brussels"
+            },
+            {
+              "type": "AIMessageChunk",
+              "content": ""
+            },
+            {
+              "type": "tool",
+              "content": "[{\"URI\": \"http://dbpedia.org/resource/Brussels\", \"surface form\": \"Brussels\"}]"
+            }
+          ]
+        ],
+        "response": "The named entity \"Brussels\" is linked to the following URI: [Brussels](http://dbpedia.org/resource/Brussels)."
+      },
+      {
+        "call": 5,
+        "model": "openai/gpt-4o-mini",
+        "messages": [
+          [
+            {
+              "type": "system",
+              "content": "You are a helpful assistant"
+            },
+            {
+              "type": "system",
+              "content": "You are an intelligent Knowledge Graph-based Question Answering system.      \n                --- Successful example for in context learning ---\n\n                                Input: Which actors were born in Germany?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> { ?uri <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Germany> } UNION { ?uri <http://dbpedia.org/ontology/birthPlace> ?place . ?place <http://dbpedia.org/ontology/country> <http://dbpedia.org/resource/Germany> } }\n\n                                --- End example ---\n\n                                Input: Which people were born in Heraklion?\n                                Output: PREFIX yago: <http://dbpedia.org/class/yago/> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX onto: <http://dbpedia.org/ontology/> SELECT DISTINCT ?uri WHERE { ?uri rdf:type onto:Person ; onto:birthPlace <http://dbpedia.org/resource/Heraklion>. }\n\n                                --- End example ---\n\n                                Input: Which soccer players were born on Malta?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/SoccerPlayer> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Malta> }\n\n                                --- End example ---\n\n                                Input: Give me all actors who were born in Berlin.\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Berlin> }\n\n                                --- End example ---\n\n                                Input: Which Chess players died in the same place they were born in?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/ChessPlayer> ; <http://dbpedia.org/ontology/birthPlace> ?x ; <http://dbpedia.org/ontology/deathPlace> ?y FILTER ( ?x = ?y ) }\n\n                                --- End example ---"
+            },
+            {
+              "type": "ai",
+              "content": "http://www.w3.org/2000/01/rdf-schema#Resource"
+            },
+            {
+              "type": "ai",
+              "content": "The named entity \"Brussels\" is linked to the following URI: [Brussels](http://dbpedia.org/resource/Brussels)."
+            },
+            {
+              "type": "human",
+              "content": "Determine the relevant property for birth location: dbo:birthPlace"
+            }
+          ]
+        ],
+        "response": "Yes, the relevant property for birth location in the DBpedia ontology is `dbo:birthPlace`."
+      },
+      {
+        "call": 6,
+        "model": "openai/gpt-4o-mini",
+        "messages": [
+          [
+            {
+              "type": "system",
+              "content": "You are a helpful assistant"
+            },
+            {
+              "type": "system",
+              "content": "You are an intelligent Knowledge Graph-based Question Answering system.      \n                --- Successful example for in context learning ---\n\n                                Input: Which actors were born in Germany?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> { ?uri <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Germany> } UNION { ?uri <http://dbpedia.org/ontology/birthPlace> ?place . ?place <http://dbpedia.org/ontology/country> <http://dbpedia.org/resource/Germany> } }\n\n                                --- End example ---\n\n                                Input: Which people were born in Heraklion?\n                                Output: PREFIX yago: <http://dbpedia.org/class/yago/> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX onto: <http://dbpedia.org/ontology/> SELECT DISTINCT ?uri WHERE { ?uri rdf:type onto:Person ; onto:birthPlace <http://dbpedia.org/resource/Heraklion>. }\n\n                                --- End example ---\n\n                                Input: Which soccer players were born on Malta?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/SoccerPlayer> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Malta> }\n\n                                --- End example ---\n\n                                Input: Give me all actors who were born in Berlin.\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Berlin> }\n\n                                --- End example ---\n\n                                Input: Which Chess players died in the same place they were born in?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/ChessPlayer> ; <http://dbpedia.org/ontology/birthPlace> ?x ; <http://dbpedia.org/ontology/deathPlace> ?y FILTER ( ?x = ?y ) }\n\n                                --- End example ---"
+            },
+            {
+              "type": "ai",
+              "content": "http://www.w3.org/2000/01/rdf-schema#Resource"
+            },
+            {
+              "type": "ai",
+              "content": "The named entity \"Brussels\" is linked to the following URI: [Brussels](http://dbpedia.org/resource/Brussels)."
+            },
+            {
+              "type": "ai",
+              "content": "Yes, the relevant property for birth location in the DBpedia ontology is `dbo:birthPlace`."
+            },
+            {
+              "type": "human",
+              "content": "Identify the class of entities we are interested in: dbo:Person"
+            }
+          ]
+        ],
+        "response": "To query for entities that are of the class `dbo:Person`, we can construct a SPARQL query. Here is the query:\n\n```sparql\nSELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Person> }\n``` \n\nThis will retrieve all entities classified as persons in the DBpedia ontology."
+      },
+      {
+        "call": 7,
+        "model": "openai/gpt-4o-mini",
+        "messages": [
+          [
+            {
+              "type": "system",
+              "content": "You are a helpful assistant"
+            },
+            {
+              "type": "system",
+              "content": "You are an intelligent Knowledge Graph-based Question Answering system.      \n                --- Successful example for in context learning ---\n\n                                Input: Which actors were born in Germany?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> { ?uri <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Germany> } UNION { ?uri <http://dbpedia.org/ontology/birthPlace> ?place . ?place <http://dbpedia.org/ontology/country> <http://dbpedia.org/resource/Germany> } }\n\n                                --- End example ---\n\n                                Input: Which people were born in Heraklion?\n                                Output: PREFIX yago: <http://dbpedia.org/class/yago/> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX onto: <http://dbpedia.org/ontology/> SELECT DISTINCT ?uri WHERE { ?uri rdf:type onto:Person ; onto:birthPlace <http://dbpedia.org/resource/Heraklion>. }\n\n                                --- End example ---\n\n                                Input: Which soccer players were born on Malta?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/SoccerPlayer> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Malta> }\n\n                                --- End example ---\n\n                                Input: Give me all actors who were born in Berlin.\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Berlin> }\n\n                                --- End example ---\n\n                                Input: Which Chess players died in the same place they were born in?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/ChessPlayer> ; <http://dbpedia.org/ontology/birthPlace> ?x ; <http://dbpedia.org/ontology/deathPlace> ?y FILTER ( ?x = ?y ) }\n\n                                --- End example ---"
+            },
+            {
+              "type": "ai",
+              "content": "http://www.w3.org/2000/01/rdf-schema#Resource"
+            },
+            {
+              "type": "ai",
+              "content": "The named entity \"Brussels\" is linked to the following URI: [Brussels](http://dbpedia.org/resource/Brussels)."
+            },
+            {
+              "type": "ai",
+              "content": "Yes, the relevant property for birth location in the DBpedia ontology is `dbo:birthPlace`."
+            },
+            {
+              "type": "ai",
+              "content": "To query for entities that are of the class `dbo:Person`, we can construct a SPARQL query. Here is the query:\n\n```sparql\nSELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Person> }\n``` \n\nThis will retrieve all entities classified as persons in the DBpedia ontology."
+            },
+            {
+              "type": "human",
+              "content": "Construct the SPARQL query structure: SELECT ?person WHERE { ?person dbo:birthPlace dbr:Brussels . }"
+            }
+          ]
+        ],
+        "response": "Here is the constructed SPARQL query structure:\n\n```sparql\nPREFIX dbo: <http://dbpedia.org/ontology/>\nPREFIX dbr: <http://dbpedia.org/resource/>\n\nSELECT ?person WHERE { ?person dbo:birthPlace dbr:Brussels . }\n``` \n\nThis query will select all persons who were born in Brussels."
+      },
+      {
+        "call": 8,
+        "model": "openai/gpt-4o-mini",
+        "messages": [
+          [
+            {
+              "type": "system",
+              "content": "You are a helpful assistant"
+            },
+            {
+              "type": "system",
+              "content": "You are an intelligent Knowledge Graph-based Question Answering system.      \n                --- Successful example for in context learning ---\n\n                                Input: Which actors were born in Germany?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> { ?uri <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Germany> } UNION { ?uri <http://dbpedia.org/ontology/birthPlace> ?place . ?place <http://dbpedia.org/ontology/country> <http://dbpedia.org/resource/Germany> } }\n\n                                --- End example ---\n\n                                Input: Which people were born in Heraklion?\n                                Output: PREFIX yago: <http://dbpedia.org/class/yago/> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX onto: <http://dbpedia.org/ontology/> SELECT DISTINCT ?uri WHERE { ?uri rdf:type onto:Person ; onto:birthPlace <http://dbpedia.org/resource/Heraklion>. }\n\n                                --- End example ---\n\n                                Input: Which soccer players were born on Malta?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/SoccerPlayer> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Malta> }\n\n                                --- End example ---\n\n                                Input: Give me all actors who were born in Berlin.\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Berlin> }\n\n                                --- End example ---\n\n                                Input: Which Chess players died in the same place they were born in?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/ChessPlayer> ; <http://dbpedia.org/ontology/birthPlace> ?x ; <http://dbpedia.org/ontology/deathPlace> ?y FILTER ( ?x = ?y ) }\n\n                                --- End example ---"
+            },
+            {
+              "type": "ai",
+              "content": "http://www.w3.org/2000/01/rdf-schema#Resource"
+            },
+            {
+              "type": "ai",
+              "content": "The named entity \"Brussels\" is linked to the following URI: [Brussels](http://dbpedia.org/resource/Brussels)."
+            },
+            {
+              "type": "ai",
+              "content": "Yes, the relevant property for birth location in the DBpedia ontology is `dbo:birthPlace`."
+            },
+            {
+              "type": "ai",
+              "content": "To query for entities that are of the class `dbo:Person`, we can construct a SPARQL query. Here is the query:\n\n```sparql\nSELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Person> }\n``` \n\nThis will retrieve all entities classified as persons in the DBpedia ontology."
+            },
+            {
+              "type": "ai",
+              "content": "Here is the constructed SPARQL query structure:\n\n```sparql\nPREFIX dbo: <http://dbpedia.org/ontology/>\nPREFIX dbr: <http://dbpedia.org/resource/>\n\nSELECT ?person WHERE { ?person dbo:birthPlace dbr:Brussels . }\n``` \n\nThis query will select all persons who were born in Brussels."
+            },
+            {
+              "type": "human",
+              "content": "Finalize the SPARQL query by ensuring correct prefixes are included: PREFIX dbo: <http://dbpedia.org/ontology/> PREFIX dbr: <http://dbpedia.org/resource/>"
+            }
+          ]
+        ],
+        "response": "Here is the finalized SPARQL query with the correct prefixes included:\n\n```sparql\nPREFIX dbo: <http://dbpedia.org/ontology/>\nPREFIX dbr: <http://dbpedia.org/resource/>\n\nSELECT DISTINCT ?person WHERE { \n    ?person a dbo:Person ; \n    dbo:birthPlace dbr:Brussels . \n}\n```\n\nThis query will select distinct individuals classified as persons who were born in Brussels."
+      },
+      {
+        "call": 9,
+        "model": "openai/gpt-4o-mini",
+        "messages": [
+          [
+            {
+              "type": "system",
+              "content": "You are a helpful assistant"
+            },
+            {
+              "type": "system",
+              "content": "You are an intelligent Knowledge Graph-based Question Answering system.      \n                --- Successful example for in context learning ---\n\n                                Input: Which actors were born in Germany?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> { ?uri <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Germany> } UNION { ?uri <http://dbpedia.org/ontology/birthPlace> ?place . ?place <http://dbpedia.org/ontology/country> <http://dbpedia.org/resource/Germany> } }\n\n                                --- End example ---\n\n                                Input: Which people were born in Heraklion?\n                                Output: PREFIX yago: <http://dbpedia.org/class/yago/> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX onto: <http://dbpedia.org/ontology/> SELECT DISTINCT ?uri WHERE { ?uri rdf:type onto:Person ; onto:birthPlace <http://dbpedia.org/resource/Heraklion>. }\n\n                                --- End example ---\n\n                                Input: Which soccer players were born on Malta?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/SoccerPlayer> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Malta> }\n\n                                --- End example ---\n\n                                Input: Give me all actors who were born in Berlin.\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Berlin> }\n\n                                --- End example ---\n\n                                Input: Which Chess players died in the same place they were born in?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/ChessPlayer> ; <http://dbpedia.org/ontology/birthPlace> ?x ; <http://dbpedia.org/ontology/deathPlace> ?y FILTER ( ?x = ?y ) }\n\n                                --- End example ---"
+            },
+            {
+              "type": "ai",
+              "content": "http://www.w3.org/2000/01/rdf-schema#Resource"
+            },
+            {
+              "type": "ai",
+              "content": "The named entity \"Brussels\" is linked to the following URI: [Brussels](http://dbpedia.org/resource/Brussels)."
+            },
+            {
+              "type": "ai",
+              "content": "Yes, the relevant property for birth location in the DBpedia ontology is `dbo:birthPlace`."
+            },
+            {
+              "type": "ai",
+              "content": "To query for entities that are of the class `dbo:Person`, we can construct a SPARQL query. Here is the query:\n\n```sparql\nSELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Person> }\n``` \n\nThis will retrieve all entities classified as persons in the DBpedia ontology."
+            },
+            {
+              "type": "ai",
+              "content": "Here is the constructed SPARQL query structure:\n\n```sparql\nPREFIX dbo: <http://dbpedia.org/ontology/>\nPREFIX dbr: <http://dbpedia.org/resource/>\n\nSELECT ?person WHERE { ?person dbo:birthPlace dbr:Brussels . }\n``` \n\nThis query will select all persons who were born in Brussels."
+            },
+            {
+              "type": "ai",
+              "content": "Here is the finalized SPARQL query with the correct prefixes included:\n\n```sparql\nPREFIX dbo: <http://dbpedia.org/ontology/>\nPREFIX dbr: <http://dbpedia.org/resource/>\n\nSELECT DISTINCT ?person WHERE { \n    ?person a dbo:Person ; \n    dbo:birthPlace dbr:Brussels . \n}\n```\n\nThis query will select distinct individuals classified as persons who were born in Brussels."
+            },
+            {
+              "type": "human",
+              "content": "{'en': 'Make sure that the query is formatted correctly. No extra text. No markdown. Just plain SPARQL query.\\nDetermine whether to output a URI (SELECT ?uri), number (COUNT), date, boolean (ASK), string (SELECT ?label)\\nDON\\'T USE \"SERVICE wikibase:label\"\\n'}"
+            }
+          ]
+        ],
+        "response": "PREFIX dbo: <http://dbpedia.org/ontology/>\nPREFIX dbr: <http://dbpedia.org/resource/>\n\nSELECT ?uri WHERE { \n    ?uri a dbo:Person ; \n    dbo:birthPlace dbr:Brussels . \n}"
+      },
+      {
+        "call": 10,
+        "model": "openai/gpt-4o-mini",
+        "messages": [
+          [
+            {
+              "type": "system",
+              "content": "You are a helpful assistant"
+            },
+            {
+              "type": "system",
+              "content": "You are an intelligent Knowledge Graph-based Question Answering system.      \n                --- Successful example for in context learning ---\n\n                                Input: Which actors were born in Germany?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> { ?uri <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Germany> } UNION { ?uri <http://dbpedia.org/ontology/birthPlace> ?place . ?place <http://dbpedia.org/ontology/country> <http://dbpedia.org/resource/Germany> } }\n\n                                --- End example ---\n\n                                Input: Which people were born in Heraklion?\n                                Output: PREFIX yago: <http://dbpedia.org/class/yago/> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX onto: <http://dbpedia.org/ontology/> SELECT DISTINCT ?uri WHERE { ?uri rdf:type onto:Person ; onto:birthPlace <http://dbpedia.org/resource/Heraklion>. }\n\n                                --- End example ---\n\n                                Input: Which soccer players were born on Malta?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/SoccerPlayer> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Malta> }\n\n                                --- End example ---\n\n                                Input: Give me all actors who were born in Berlin.\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Actor> ; <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Berlin> }\n\n                                --- End example ---\n\n                                Input: Which Chess players died in the same place they were born in?\n                                Output: SELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/ChessPlayer> ; <http://dbpedia.org/ontology/birthPlace> ?x ; <http://dbpedia.org/ontology/deathPlace> ?y FILTER ( ?x = ?y ) }\n\n                                --- End example ---"
+            },
+            {
+              "type": "ai",
+              "content": "http://www.w3.org/2000/01/rdf-schema#Resource"
+            },
+            {
+              "type": "ai",
+              "content": "The named entity \"Brussels\" is linked to the following URI: [Brussels](http://dbpedia.org/resource/Brussels)."
+            },
+            {
+              "type": "ai",
+              "content": "Yes, the relevant property for birth location in the DBpedia ontology is `dbo:birthPlace`."
+            },
+            {
+              "type": "ai",
+              "content": "To query for entities that are of the class `dbo:Person`, we can construct a SPARQL query. Here is the query:\n\n```sparql\nSELECT DISTINCT ?uri WHERE { ?uri a <http://dbpedia.org/ontology/Person> }\n``` \n\nThis will retrieve all entities classified as persons in the DBpedia ontology."
+            },
+            {
+              "type": "ai",
+              "content": "Here is the constructed SPARQL query structure:\n\n```sparql\nPREFIX dbo: <http://dbpedia.org/ontology/>\nPREFIX dbr: <http://dbpedia.org/resource/>\n\nSELECT ?person WHERE { ?person dbo:birthPlace dbr:Brussels . }\n``` \n\nThis query will select all persons who were born in Brussels."
+            },
+            {
+              "type": "ai",
+              "content": "Here is the finalized SPARQL query with the correct prefixes included:\n\n```sparql\nPREFIX dbo: <http://dbpedia.org/ontology/>\nPREFIX dbr: <http://dbpedia.org/resource/>\n\nSELECT DISTINCT ?person WHERE { \n    ?person a dbo:Person ; \n    dbo:birthPlace dbr:Brussels . \n}\n```\n\nThis query will select distinct individuals classified as persons who were born in Brussels."
+            },
+            {
+              "type": "ai",
+              "content": "PREFIX dbo: <http://dbpedia.org/ontology/>\nPREFIX dbr: <http://dbpedia.org/resource/>\n\nSELECT ?uri WHERE { \n    ?uri a dbo:Person ; \n    dbo:birthPlace dbr:Brussels . \n}"
+            },
+            {
+              "type": "human",
+              "content": "\n    This is feedback to your generated SPARQL query produced by executing it on a triplestore.\n    Please rework your query if neccessary.\n\n    Initial question: Which people were born in Brussels?\n    Your query: \n    PREFIX dbo: <http://dbpedia.org/ontology/>\nPREFIX dbr: <http://dbpedia.org/resource/>\n\nSELECT ?uri WHERE { \n    ?uri a dbo:Person ; \n    dbo:birthPlace dbr:Brussels . \n}\n\n    --- Start triplestore response ---\n    [{\"uri\": {\"type\": \"uri\", \"value\": \"http://dbpedia.org/resource/Naim_Van_Attenhoven\"}}, {\"uri\": {\"type\": \"uri\", \"value\": \"http://dbpedia.org/resource/Naim_Van_Attenhoven\"}}, {\"uri\": {\"type\": \"uri\", \"value\": \"http://dbpedia.org/resource/Za\\u00efd_Bafdili\"}}]\n    --- End triplestore response ---\n\n    {'en': 'Make sure that the query is formatted correctly. No extra text. No markdown. Just plain SPARQL query.\\nDetermine whether to output a URI (SELECT ?uri), number (COUNT), date, boolean (ASK), string (SELECT ?label)\\nDON\\'T USE \"SERVICE wikibase:label\"\\n'}\n    "
+            }
+          ]
+        ],
+        "response": "PREFIX dbo: <http://dbpedia.org/ontology/>\nPREFIX dbr: <http://dbpedia.org/resource/>\n\nSELECT DISTINCT ?uri WHERE { \n    ?uri a dbo:Person ; \n    dbo:birthPlace dbr:Brussels . \n}"
+      }
+    ]
+  }
+]
