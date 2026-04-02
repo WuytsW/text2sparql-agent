@@ -85,7 +85,7 @@ def dbpedia_el(ne_list: list) -> list:
         relations = falcon_result.get("relations_dbpedia", [])
         nel_list += entities
         nel_list += relations
-        
+  
     return nel_list
 
 def get_corporate_entities(query: str, is_relation: bool) -> list:

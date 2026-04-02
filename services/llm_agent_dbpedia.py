@@ -8,6 +8,7 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from dotenv import load_dotenv
 
+from services.translate import translate_question
 
 from typing import List
 
@@ -48,13 +49,16 @@ class LogLLMCallbackHandler(BaseCallbackHandler):
         self.call_count = 0
         self._log_entries = []
 
-    def reset(self, question: str):
+    def reset(self, question: str, enabled: bool = True):
         self.call_count = 0
         self._log_entries = []
         self._question = question
         self._start_time = datetime.now().isoformat()
+        self._enabled = enabled
 
     def _flush_to_file(self, sparql: str, log_path: str = "logs/llm_calls.json"):
+        if not self._enabled:
+            return
         record = {
             "time": self._start_time,
             "question": self._question,
@@ -76,12 +80,16 @@ class LogLLMCallbackHandler(BaseCallbackHandler):
 
     def on_chat_model_start(self, serialized, _messages, **kwargs):
         self.call_count += 1
+        if not self._enabled:
+            return
         model = serialized.get("kwargs", {}).get("model_name", "unknown")
         msgs = [[{"type": m.type, "content": m.content} for m in grp] for grp in _messages]
         self._log_entries.append({"call": self.call_count, "model": model, "messages": msgs})
         logging.info(f"{BLUE}[LLM API call #{self.call_count}] model={model} \n messages={_messages}{RESET}")
 
     def on_llm_end(self, response, **kwargs):
+        if not self._enabled:
+            return
         gen = response.generations[0][0]
         text = gen.text or (gen.message.content if hasattr(gen, "message") else "")
         if text:
@@ -141,52 +149,99 @@ class LLMAgentDBpedia:
         self.plan_llm = ChatOpenAI(
             model=model_name,
             temperature=0,
-            api_key=os.getenv("OPENROUTER_API_KEY"),
+            api_key=os.getenv("mKGQAgent_Plan_LLM"),
             base_url="https://openrouter.ai/api/v1",
-            callbacks=[self.llm_callback],
+            callbacks=[self.llm_callback]
         ).with_structured_output(Plan)
 
 
         client = Client()
         prompt = client.pull_prompt("hwchase17/openai-functions-agent")
+        logging.info(f"{CYAN}Pulled prompt for agent construction: {prompt}{RESET}")
 
         # Choose the LLM that will drive the agent
-        self.llm = ChatOpenAI(
+        self.llm_eat = ChatOpenAI(
             model=model_name,
-            api_key=os.getenv("OPENROUTER_API_KEY"),
+            api_key=os.getenv("mKGQAgent_EAT_LLM"),
             base_url="https://openrouter.ai/api/v1",
-            callbacks=[self.llm_callback],
+            callbacks=[self.llm_callback]
         )
+
+        self.llm_execution_original = ChatOpenAI(
+            model=model_name,
+            api_key=os.getenv("mKGQAgent_Execution_original_LLM"),
+            base_url="https://openrouter.ai/api/v1",
+            callbacks=[self.llm_callback]
+        )
+
+        self.llm_execution_compact = ChatOpenAI(
+            model=model_name,
+            api_key=os.getenv("mKGQAgent_Execution_compact_LLM"),
+            base_url="https://openrouter.ai/api/v1",
+            callbacks=[self.llm_callback]
+        )
+
 
         # Construct the OpenAI Functions agent
-        self.agent_runnable = create_tool_calling_agent(self.llm, tools, prompt)
+        self.agent_runnable_execution_original = create_tool_calling_agent(self.llm_execution_original, tools, prompt)
+        self.agent_runnable_execution_compact = create_tool_calling_agent(self.llm_execution_compact, tools, prompt)
 
-        self.agent_executor = AgentExecutor(
-            agent=self.agent_runnable, tools=tools, verbose=False, return_intermediate_steps=True
+
+        self.agent_executor_original = AgentExecutor(
+            agent=self.agent_runnable_execution_original, tools=tools, verbose=False, return_intermediate_steps=True
         )
-
+        self.agent_executor_compact = AgentExecutor(
+            agent=self.agent_runnable_execution_compact, tools=tools, verbose=False, return_intermediate_steps=True
+        )
         self.app = None
 
         ### EMD Initialize agent
 
     def _plan_step(self, state: PlanExecute):
+        logging.info(f"{MAGENTA}[plan_step]{RESET}")
         try:
             plan = self.plan_llm.invoke(planner_prompt_dct[self.lang].format(objective=state["input"]))
-            logging.info(f"{MAGENTA}[plan_step] Generated plan: {plan.steps}{RESET}")
+            # logging.info(f"{MAGENTA}[plan_step] Generated plan: {plan.steps}{RESET}")
             return {"plan": plan.steps + [last_task]}
 
         except Exception as e:
             plan = [last_task]
             return {"plan": plan}
         
+    def _execute_step_compact(self, state: PlanExecute):
+        logging.info(f"{MAGENTA}[execute_step]{RESET}")
+        if state["gave_feedback"]:
+            task = state["feedback_task"]
+        else:
+            all_steps = list(state["plan"])
+            state["plan"].clear()
+            task = "Complete all of the following steps in order:\n" + "\n".join(
+                f"{i+1}. {s}" for i, s in enumerate(all_steps)
+            )
+
+        try:
+            agent_response = self.agent_executor_compact.invoke({"input": task, "chat_history": state['chat_history']})
+            state['chat_history'].append(AIMessage(agent_response['output'])) # update chat history
+        except Exception as e:
+            state['chat_history'].append(AIMessage(str(e)))
+            agent_response = {"output": str(e), "intermediate_steps": "No"}
+
+        return {
+            "past_steps": [task, agent_response["output"]],
+            "intermediate_steps": [task, agent_response["intermediate_steps"]],
+            "gave_feedback": state["gave_feedback"]
+        }
+
     def _execute_step(self, state: PlanExecute):
+        logging.info(f"{MAGENTA}[execute_step]{RESET}")
+        logging.info(f"{MAGENTA}Current state: {state}{RESET}")
         if state["gave_feedback"]:
             task = state["feedback_task"]
         else:
             task = state["plan"].pop(0)
 
         try:
-            agent_response = self.agent_executor.invoke({"input": task, "chat_history": state['chat_history']})
+            agent_response = self.agent_executor_original.invoke({"input": task, "chat_history": state['chat_history']})
             state['chat_history'].append(AIMessage(agent_response['output'])) # update chat history
         except Exception as e:
             state['chat_history'].append(AIMessage(str(e)))
@@ -199,9 +254,11 @@ class LLMAgentDBpedia:
         }
 
     def _feedback_step(self, state: PlanExecute):
+        logging.info(f"{MAGENTA}[feedback_step]{RESET}")
         task = feedback_step_dict[self.lang]
         try:
             feedback = execute(query=state['chat_history'][-1].content, endpoint_url=self.sparql_endpoint)
+            logging.info(f"{MAGENTA}Execution feedback: {feedback}{RESET}")
             if type(feedback) == dict and "error" not in feedback.keys():
                 feedback = json.dumps(feedback['results']['bindings'][:3])
         except Exception as e:
@@ -213,8 +270,9 @@ class LLMAgentDBpedia:
         }
     
     def _eat_step(self, state: PlanExecute):
+        logging.info(f"{MAGENTA}[eat_step]{RESET}")
         try:
-            expected_answer_type = get_expected_answer_type(state['input'], self.llm)
+            expected_answer_type = get_expected_answer_type(state['input'], self.llm_eat)
             state['chat_history'].append(AIMessage(expected_answer_type["expected_answer_type"]["eat"])) # update chat history
         except Exception as e:
             pass
@@ -233,16 +291,10 @@ class LLMAgentDBpedia:
         workflow.add_node("eat", self._eat_step)
 
         # Add the execution step
-        workflow.add_node("agent", self._execute_step)
+        workflow.add_node("agent", self._execute_step_compact)
 
         # Add the feedback step
         workflow.add_node("feedback", self._feedback_step)
-
-
-        # Add the new step
-        
-
-
 
         workflow.set_entry_point("planner")
 
@@ -277,7 +329,7 @@ class LLMAgentDBpedia:
         if len(state["plan"]) == 0 and state["gave_feedback"] == True:
             return END
   
-    def generate_sparql(self, input_question: str) -> str:
+    def generate_sparql(self, input_question: str, log: bool = False) -> str:
         """
         Convert a natural language question to a SPARQL query
         
@@ -289,12 +341,18 @@ class LLMAgentDBpedia:
             A SPARQL query string
         """
         try:
-            self.llm_callback.reset(input_question)
+            # Translate the input question to English if necessary, using the LLM-based translator
+            logging.info(f"{YELLOW}Received question: \n{input_question}{RESET}")
+            translated_input_question = translate_question(input_question)
+            logging.info(f"{YELLOW}Translated question: \n{translated_input_question}{RESET}")
+            
+            
+            self.llm_callback.reset(translated_input_question, enabled=log)
 
             if self.app is None:
                 self._init_workflow()
 
-            results = self.icl_db.similarity_search_with_score(input_question, k=self.return_N)
+            results = self.icl_db.similarity_search_with_score(translated_input_question, k=self.return_N)
 
             example = "--- Successful example for in context learning ---"
 
@@ -313,19 +371,21 @@ class LLMAgentDBpedia:
                 example += "--- End example ---"
 
             agent_result = self.app.invoke(
-                {"input": input_question, "chat_history": [SystemMessage(content=f"""{system_prompt[self.lang]}      
+                {"input": translated_input_question, "chat_history": [SystemMessage(content=f"""{system_prompt[self.lang]}      
                 {example}""")],
                 "gave_feedback": False}
             )
         
             sparql_result = agent_result['chat_history'][-1].content
 
-            logging.info(f"{CYAN}[Total LLM calls]: {self.llm_callback.call_count}{RESET}")
-            self.llm_callback._flush_to_file(sparql_result)
-            logging.info(f"Generated SPARQL query: {sparql_result}")
+            if log:
+                logging.info(f"{YELLOW}Raw generated SPARQL query: \n{sparql_result}{RESET}")
+                logging.info(f"{CYAN}[Total LLM calls]: {self.llm_callback.call_count}{RESET}")
+                self.llm_callback._flush_to_file(sparql_result)
+                logging.info(f"Generated SPARQL query: {sparql_result}")
 
             generated_query = post_process(sparql_result)
-
+            logging.info(f"{YELLOW}Post-processed generated SPARQL query: \n{generated_query}{RESET}")
             return generated_query
         except Exception as e:
             logging.error(f"Error in generate_sparql: {e}")
