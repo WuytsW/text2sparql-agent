@@ -22,7 +22,7 @@ dbpedia_agent = LLMAgentDBpedia()
 #corporate_agent = LLMAgentCorporate()
 
 @app.get("/api")
-async def get_answer(question: str, dataset: str, log: bool = False):
+async def get_answer(question: str, dataset: str, log: bool = False, max_feedback: int = 5):
     """
     Process a natural language question and convert it to SPARQL query for the specified dataset.
 
@@ -38,7 +38,7 @@ async def get_answer(question: str, dataset: str, log: bool = False):
         raise HTTPException(status_code=404, detail="Unknown dataset. Please use one of the known datasets.")
 
     if "dbpedia" in dataset:
-        sparql_query = dbpedia_agent.generate_sparql(question, log=log)
+        sparql_query = dbpedia_agent.generate_sparql(question, log=log, max_feedback=max_feedback)
     #elif "corporate" in dataset:
        # sparql_query = corporate_agent.generate_sparql(question)
     else:

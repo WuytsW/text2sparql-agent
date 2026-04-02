@@ -24,7 +24,8 @@ from prompts.dbpedia import (
     system_prompt,
     last_task,
     planner_prompt_dct,
-    feedback_step_dict
+    feedback_step_dict,
+    feedback_validation_prompt
 )
 
 BLACK   = "\033[30m"
@@ -37,6 +38,8 @@ CYAN    = "\033[36m"
 WHITE   = "\033[37m"
 
 RESET   = "\033[0m"
+
+MAX_FEEDBACK = 5
 
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 logging.getLogger().setLevel(logging.INFO)
@@ -167,6 +170,13 @@ class LLMAgentDBpedia:
             callbacks=[self.llm_callback]
         )
 
+        self.llm_validate = ChatOpenAI(
+            model=model_name,
+            api_key=os.getenv("mKGQAgent_Validation_LLM"),
+            base_url="https://openrouter.ai/api/v1",
+            callbacks=[self.llm_callback]
+        )
+
         self.llm_execution_original = ChatOpenAI(
             model=model_name,
             api_key=os.getenv("mKGQAgent_Execution_original_LLM"),
@@ -210,7 +220,7 @@ class LLMAgentDBpedia:
         
     def _execute_step_compact(self, state: PlanExecute):
         logging.info(f"{MAGENTA}[execute_step]{RESET}")
-        if state["gave_feedback"]:
+        if state["feedback_counter"] > 0:
             task = state["feedback_task"]
         else:
             all_steps = list(state["plan"])
@@ -229,13 +239,12 @@ class LLMAgentDBpedia:
         return {
             "past_steps": [task, agent_response["output"]],
             "intermediate_steps": [task, agent_response["intermediate_steps"]],
-            "gave_feedback": state["gave_feedback"]
         }
 
     def _execute_step(self, state: PlanExecute):
         logging.info(f"{MAGENTA}[execute_step]{RESET}")
         logging.info(f"{MAGENTA}Current state: {state}{RESET}")
-        if state["gave_feedback"]:
+        if state["feedback_counter"] > 0:
             task = state["feedback_task"]
         else:
             task = state["plan"].pop(0)
@@ -250,23 +259,66 @@ class LLMAgentDBpedia:
         return {
             "past_steps": [task, agent_response["output"]],
             "intermediate_steps": [task, agent_response["intermediate_steps"]],
-            "gave_feedback": state["gave_feedback"]
         }
 
+    
+
     def _feedback_step(self, state: PlanExecute):
-        logging.info(f"{MAGENTA}[feedback_step]{RESET}")
-        task = feedback_step_dict[self.lang]
+        n = state["feedback_counter"] + 1
+        logging.info(f"{MAGENTA}[feedback_step] attempt={n}{RESET}")
+        query = state['chat_history'][-1].content
+
         try:
-            feedback = execute(query=state['chat_history'][-1].content, endpoint_url=self.sparql_endpoint)
-            logging.info(f"{MAGENTA}Execution feedback: {feedback}{RESET}")
-            if type(feedback) == dict and "error" not in feedback.keys():
-                feedback = json.dumps(feedback['results']['bindings'][:3])
+            raw_feedback = execute(query=query, endpoint_url=self.sparql_endpoint)
+            logging.info(f"{MAGENTA}Execution feedback: {raw_feedback}{RESET}")
+            if isinstance(raw_feedback, dict) and "error" not in raw_feedback:
+                feedback_str = json.dumps(raw_feedback['results']['bindings'][:3])
+            else:
+                feedback_str = str(raw_feedback)
         except Exception as e:
-            feedback = str(e)
-        
+            feedback_str = str(e)
+
+        # LLM call to check if the results actually answer the question
+        valid = False
+        try:
+            validation_prompt = feedback_validation_prompt[self.lang].format(
+                question=state["input"],
+                query=query,
+                feedback=feedback_str
+            )
+            validation_response = self.llm_validate.invoke(validation_prompt).content.strip().upper()
+            logging.info(f"{MAGENTA}[feedback_step] Validation: {validation_response}{RESET}")
+            valid = validation_response.startswith("YES")
+        except Exception as e:
+            logging.error(f"[feedback_step] Validation LLM error: {e}")
+
+        # Label query, append result and validation to chat history
+        state['chat_history'][-1] = AIMessage(f"query_{n}: {query}")
+        state['chat_history'].append(AIMessage(f"result_{n}: {feedback_str}"))
+        state['chat_history'].append(AIMessage(f"validation_{n}: {'YES' if valid else 'NO'}"))
+
+        feedback_task_str = ""
+        if not valid:
+            history_lines = []
+            for msg in state['chat_history']:
+                c = msg.content
+                if any(c.startswith(f"{prefix}_") for prefix in ("query", "result", "validation")):
+                    history_lines.append(f"    {c}")
+            history_str = "\n".join(history_lines)
+
+            feedback_task_str = feedback_step_dict[self.lang].format(
+                question=state["input"],
+                query=query,
+                feedback=feedback_str,
+                history=history_str,
+                last_task=last_task
+            )
+            state['chat_history'].append(AIMessage(feedback_task_str))
+
         return {
-            "feedback_task": str(task.format(question=state["input"], query=state['chat_history'][-1].content, feedback=feedback, last_task=last_task)),
-            "gave_feedback": True
+            "feedback_task": feedback_task_str,
+            "feedback_counter": n,
+            "valid_response": valid,
         }
     
     def _eat_step(self, state: PlanExecute):
@@ -277,10 +329,8 @@ class LLMAgentDBpedia:
         except Exception as e:
             pass
 
-        return {
-            "gave_feedback": state["gave_feedback"]
-        }
-    
+        return {}
+
     def _init_workflow(self):
         workflow = StateGraph(PlanExecute)
 
@@ -313,33 +363,50 @@ class LLMAgentDBpedia:
             }
         )
 
-        # From feedback we go to agent
-        workflow.add_edge("feedback", "agent")
+        # From feedback go to agent for retry, or END if valid/max reached
+        workflow.add_conditional_edges(
+            "feedback",
+            self._post_feedback_router,
+            {
+                "agent": "agent",
+                END: END
+            }
+        )
 
 
         self.app = workflow.compile()
 
         return True
 
+    def _post_feedback_router(self, state: PlanExecute):
+        if state["valid_response"] or state["feedback_counter"] >= self.MAX_FEEDBACK:
+            return END
+        return "agent"
+
     def _feedback_router(self, state: PlanExecute):
         if len(state["plan"]) > 0:
             return "agent"
-        if len(state["plan"]) == 0 and state["gave_feedback"] == False:
+        if state["feedback_counter"] == 0:
             return "feedback"
-        if len(state["plan"]) == 0 and state["gave_feedback"] == True:
+        if state["valid_response"] or state["feedback_counter"] >= self.MAX_FEEDBACK:
             return END
+        return "feedback"
   
-    def generate_sparql(self, input_question: str, log: bool = False) -> str:
+    def generate_sparql(self, input_question: str, log: bool = False, max_feedback: int = 5) -> str:
         """
         Convert a natural language question to a SPARQL query
         
         Args:
             question: The natural language question
             dataset: The dataset URL to query against
+            max_feedback: The maximum number of feedback iterations allowed
             
         Returns:
             A SPARQL query string
         """
+
+        self.MAX_FEEDBACK = max_feedback
+
         try:
             # Translate the input question to English if necessary, using the LLM-based translator
             logging.info(f"{YELLOW}Received question: \n{input_question}{RESET}")
@@ -371,12 +438,18 @@ class LLMAgentDBpedia:
                 example += "--- End example ---"
 
             agent_result = self.app.invoke(
-                {"input": translated_input_question, "chat_history": [SystemMessage(content=f"""{system_prompt[self.lang]}      
+                {"input": translated_input_question, "chat_history": [SystemMessage(content=f"""{system_prompt[self.lang]}
                 {example}""")],
-                "gave_feedback": False}
+                "feedback_counter": 0,
+                "valid_response": False}
             )
         
-            sparql_result = agent_result['chat_history'][-1].content
+            # If feedback loop ran, the final query is in the last query_N message
+            chat_history = agent_result['chat_history']
+            sparql_result = next(
+                (msg.content.split(": ", 1)[1] for msg in reversed(chat_history) if msg.content.startswith("query_")),
+                chat_history[-1].content
+            )
 
             if log:
                 logging.info(f"{YELLOW}Raw generated SPARQL query: \n{sparql_result}{RESET}")

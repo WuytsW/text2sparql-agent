@@ -27,17 +27,32 @@ Make sure that the output is VALID JSON"""
 
 feedback_step_dict = {
     "en": """
-    This is feedback to your generated SPARQL query produced by executing it on a triplestore.
-    Please rework your query if neccessary.
+    Your SPARQL query was executed against a triplestore but the results do not correctly answer the question.
+    Review ALL previous attempts below and generate an improved query that avoids the same mistakes.
 
     Initial question: {question}
-    Your query: 
-    {query}
 
-    --- Start triplestore response ---
-    {feedback}
-    --- End triplestore response ---
+    --- Attempt history ---
+{history}
+    --- End attempt history ---
+
+    Latest attempt:
+    Query: {query}
+    Triplestore results: {feedback}
+    Validation: INVALID
 
     {last_task}
     """
   }
+
+feedback_validation_prompt = {
+    "en": """You are a SPARQL query validator. A SPARQL query was executed against a triplestore and produced results.
+Determine whether the triplestore results actually answer the original question.
+
+Original question: {question}
+SPARQL query: {query}
+Triplestore results: {feedback}
+
+Reply with ONLY "YES" if the results answer the question, or "NO" if they do not (e.g. empty results, wrong data type, unrelated results, or an error occurred).
+Answer:"""
+}

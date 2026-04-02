@@ -10,4 +10,5 @@ class PlanExecute(TypedDict):
     chat_history: list
     response: str
     feedback_task: str
-    gave_feedback: bool
+    feedback_counter: int
+    valid_response: bool
