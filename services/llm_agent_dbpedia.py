@@ -1,7 +1,6 @@
 from langsmith import Client
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, AIMessage
-from langchain_core.callbacks import BaseCallbackHandler
 from langgraph.graph import StateGraph, END
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -15,7 +14,9 @@ from typing import List
 import os
 import json
 import logging
-from datetime import datetime
+from services.LogLLMCallbackHandler import LogLLMCallbackHandler
+from  services.shape_generation import generate_shape
+from services.entity_extraction import extract_entities
 
 from services.llm_utils import dbpedia_el, Plan, get_expected_answer_type
 from services.ld_utils import execute, post_process
@@ -27,6 +28,12 @@ from prompts.dbpedia import (
     feedback_step_dict
 )
 
+
+
+logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
+logging.getLogger().setLevel(logging.INFO)
+
+
 BLACK   = "\033[30m"
 RED     = "\033[31m"
 GREEN   = "\033[32m"
@@ -37,66 +44,6 @@ CYAN    = "\033[36m"
 WHITE   = "\033[37m"
 
 RESET   = "\033[0m"
-
-logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
-logging.getLogger().setLevel(logging.INFO)
-
-
-
-class LogLLMCallbackHandler(BaseCallbackHandler):
-    def __init__(self):
-        super().__init__()
-        self.call_count = 0
-        self._log_entries = []
-
-    def reset(self, question: str, enabled: bool = True):
-        self.call_count = 0
-        self._log_entries = []
-        self._question = question
-        self._start_time = datetime.now().isoformat()
-        self._enabled = enabled
-
-    def _flush_to_file(self, sparql: str, log_path: str = "logs/llm_calls.json"):
-        if not self._enabled:
-            return
-        record = {
-            "time": self._start_time,
-            "question": self._question,
-            "total_llm_calls": self.call_count,
-            "sparql": sparql,
-            "calls": self._log_entries,
-        }
-        os.makedirs(os.path.dirname(log_path), exist_ok=True)
-        existing = []
-        if os.path.exists(log_path):
-            with open(log_path, "r", encoding="utf-8") as f:
-                try:
-                    existing = json.load(f)
-                except json.JSONDecodeError:
-                    existing = []
-        existing.append(record)
-        with open(log_path, "w", encoding="utf-8") as f:
-            json.dump(existing, f, indent=2, ensure_ascii=False)
-
-    def on_chat_model_start(self, serialized, _messages, **kwargs):
-        self.call_count += 1
-        if not self._enabled:
-            return
-        model = serialized.get("kwargs", {}).get("model_name", "unknown")
-        msgs = [[{"type": m.type, "content": m.content} for m in grp] for grp in _messages]
-        self._log_entries.append({"call": self.call_count, "model": model, "messages": msgs})
-        logging.info(f"{BLUE}[LLM API call #{self.call_count}] model={model} \n messages={_messages}{RESET}")
-
-    def on_llm_end(self, response, **kwargs):
-        if not self._enabled:
-            return
-        gen = response.generations[0][0]
-        text = gen.text or (gen.message.content if hasattr(gen, "message") else "")
-        if text:
-            if self._log_entries:
-                self._log_entries[-1]["response"] = text
-            logging.info(f"{GREEN}[LLM response #{self.call_count}]:\n{text}{RESET}")
-
 
 class LLMAgentDBpedia:
     """
@@ -181,6 +128,15 @@ class LLMAgentDBpedia:
             callbacks=[self.llm_callback]
         )
 
+        self.entities_llm = ChatOpenAI(
+            model=model_name,
+            api_key=os.getenv("mKGQAgent_Entities_LLM"),
+            base_url="https://openrouter.ai/api/v1",
+            callbacks=[self.llm_callback],
+            temperature=0.2,
+            max_tokens=50,
+        )
+
 
         # Construct the OpenAI Functions agent
         self.agent_runnable_execution_original = create_tool_calling_agent(self.llm_execution_original, tools, prompt)
@@ -202,10 +158,10 @@ class LLMAgentDBpedia:
         try:
             plan = self.plan_llm.invoke(planner_prompt_dct[self.lang].format(objective=state["input"]))
             # logging.info(f"{MAGENTA}[plan_step] Generated plan: {plan.steps}{RESET}")
-            return {"plan": plan.steps + [last_task]}
+            return {"plan": plan.steps + [last_task[self.lang]]}
 
         except Exception as e:
-            plan = [last_task]
+            plan = [last_task[self.lang]]
             return {"plan": plan}
         
     def _execute_step_compact(self, state: PlanExecute):
@@ -219,8 +175,23 @@ class LLMAgentDBpedia:
                 f"{i+1}. {s}" for i, s in enumerate(all_steps)
             )
 
+        chat_history = state['chat_history']
+        if state.get("shape"):
+            shape_message = SystemMessage(content=(
+                "--- Entity shapes (ShEx) for the entities in this question ---\n"
+                + "\n".join(state["shape"])
+                + "\n--- End entity shapes ---\n"
+                "\nIMPORTANT INSTRUCTIONS FOR SPARQL GENERATION:\n"
+                "- Only use properties that are explicitly listed in the entity shapes above.\n"
+                "- Do NOT invent properties. Use only what appears in the shape.\n"
+                "- dcterms:subject ONLY links to Category: resources (e.g. dbc:Presidents_of_the_United_States). NEVER use dcterms:subject with a regular resource.\n"
+                "- To find entities related to another entity, follow the property FROM that entity (e.g. dbr:Vietnam_War dbo:commander ?uri).\n"
+                "- To filter by type of person, prefer dcterms:subject with a Category over rdf:type with an ontology class.\n"
+            ))
+            chat_history = list(state['chat_history']) + [shape_message]
+
         try:
-            agent_response = self.agent_executor_compact.invoke({"input": task, "chat_history": state['chat_history']})
+            agent_response = self.agent_executor_compact.invoke({"input": task, "chat_history": chat_history})
             state['chat_history'].append(AIMessage(agent_response['output'])) # update chat history
         except Exception as e:
             state['chat_history'].append(AIMessage(str(e)))
@@ -265,7 +236,7 @@ class LLMAgentDBpedia:
             feedback = str(e)
         
         return {
-            "feedback_task": str(task.format(question=state["input"], query=state['chat_history'][-1].content, feedback=feedback, last_task=last_task)),
+            "feedback_task": str(task.format(question=state["input"], query=state['chat_history'][-1].content, feedback=feedback, last_task=last_task[self.lang])),
             "gave_feedback": True
         }
     
@@ -280,6 +251,17 @@ class LLMAgentDBpedia:
         return {
             "gave_feedback": state["gave_feedback"]
         }
+
+    def _shaper_step(self, state: PlanExecute):
+        logging.info(f"{MAGENTA}[shaper_step]{RESET}")
+
+        entities = extract_entities(state['input'], self.entities_llm)
+        shape = generate_shape(entities)
+
+        return {
+            "shape": [shape] if shape else [],
+            "gave_feedback": state["gave_feedback"]
+        }
     
     def _init_workflow(self):
         workflow = StateGraph(PlanExecute)
@@ -289,6 +271,8 @@ class LLMAgentDBpedia:
 
         # Add the eat step
         workflow.add_node("eat", self._eat_step)
+
+        workflow.add_node("shaper", self._shaper_step)
 
         # Add the execution step
         workflow.add_node("agent", self._execute_step_compact)
@@ -300,7 +284,8 @@ class LLMAgentDBpedia:
 
         # From plan we go to agent
         workflow.add_edge("planner", "eat")
-        workflow.add_edge("eat", "agent")
+        workflow.add_edge("eat", "shaper")
+        workflow.add_edge("shaper", "agent")
 
         workflow.add_conditional_edges(
             "agent",
@@ -371,9 +356,10 @@ class LLMAgentDBpedia:
                 example += "--- End example ---"
 
             agent_result = self.app.invoke(
-                {"input": translated_input_question, "chat_history": [SystemMessage(content=f"""{system_prompt[self.lang]}      
+                {"input": translated_input_question, "chat_history": [SystemMessage(content=f"""{system_prompt[self.lang]}
                 {example}""")],
-                "gave_feedback": False}
+                "gave_feedback": False,
+                "shape": []}
             )
         
             sparql_result = agent_result['chat_history'][-1].content

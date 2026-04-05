@@ -2,6 +2,24 @@ system_prompt = {
     "en": """You are an intelligent Knowledge Graph-based Question Answering system.""",
 }
 
+entities_extraction_prompt = {
+    "en": """Extract the most relevant named entities from the following question:
+    
+Question: "{nlq}"
+    
+Return a comma-separated list of entity names without explanations. Think rationally and in context of the question but respond only with entities literally named in the question. Extracted entities should be in singular form.
+
+exmaple1: "Who developed Skype?"
+result1: "Skype"
+
+exmaple1: "Which other weapons did the designer of the Uzi develop?"
+result1: "Uzi, weapon"
+
+exmaple1: "Which state of the USA has the highest population density?"
+result1: "U.S. state, area, population"""
+}
+
+
 last_task = {
     "en": """Make sure that the query is formatted correctly. No extra text. No markdown. Just plain SPARQL query.
 Determine whether to output a URI (SELECT ?uri), number (COUNT), date, boolean (ASK), string (SELECT ?label)
