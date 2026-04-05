@@ -46,15 +46,19 @@ Make sure that the output is VALID JSON"""
 feedback_step_dict = {
     "en": """
     This is feedback to your generated SPARQL query produced by executing it on a triplestore.
-    Please rework your query if neccessary.
 
     Initial question: {question}
-    Your query: 
+    Your query:
     {query}
 
     --- Start triplestore response ---
     {feedback}
     --- End triplestore response ---
+
+    If the response contains results, verify they correctly answer the question and refine if needed.
+    If the response says the query returned EMPTY results or contains an error, you MUST rewrite the query.
+    Common causes of empty results: wrong URIs, wrong property paths, missing prefixes, or overly restrictive filters.
+    Try alternative DBpedia properties or use the entity linking tool again to find correct URIs.
 
     {last_task}
     """

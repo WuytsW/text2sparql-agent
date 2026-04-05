@@ -10,5 +10,6 @@ class PlanExecute(TypedDict):
     chat_history: list
     response: str
     feedback_task: str
-    gave_feedback: bool
+    feedback_count: int
+    last_query_valid: bool
     shape: Annotated[List[str], operator.add]

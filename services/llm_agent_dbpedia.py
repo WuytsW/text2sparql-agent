@@ -1,6 +1,6 @@
 from langsmith import Client
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage, AIMessage
+from langchain_core.messages import SystemMessage, AIMessage, HumanMessage
 from langgraph.graph import StateGraph, END
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -15,7 +15,7 @@ import os
 import json
 import logging
 from services.LogLLMCallbackHandler import LogLLMCallbackHandler
-from  services.shape_generation import generate_shape
+from services.shape_generation import generate_shex_only, get_raw_ancestor_props, append_ancestor_props_with_values
 from services.entity_extraction import extract_entities
 
 from services.llm_utils import dbpedia_el, Plan, get_expected_answer_type
@@ -137,6 +137,13 @@ class LLMAgentDBpedia:
             max_tokens=50,
         )
 
+        self.llm_shapes = ChatOpenAI(
+            model=model_name,
+            api_key=os.getenv("mKGQAgent_Shapes_LLM"),
+            base_url="https://openrouter.ai/api/v1",
+            callbacks=[self.llm_callback]
+        )
+
 
         # Construct the OpenAI Functions agent
         self.agent_runnable_execution_original = create_tool_calling_agent(self.llm_execution_original, tools, prompt)
@@ -166,8 +173,12 @@ class LLMAgentDBpedia:
         
     def _execute_step_compact(self, state: PlanExecute):
         logging.info(f"{MAGENTA}[execute_step]{RESET}")
-        if state["gave_feedback"]:
-            task = state["feedback_task"]
+        if state["feedback_count"] > 0:
+            # Record the feedback in chat_history so all future rounds can see
+            # why each previous query was rejected — prevents the agent looping
+            # back to an already-tried (and failed) query.
+            state['chat_history'].append(HumanMessage(content=state["feedback_task"]))
+            task = last_task[self.lang]
         else:
             all_steps = list(state["plan"])
             state["plan"].clear()
@@ -181,12 +192,6 @@ class LLMAgentDBpedia:
                 "--- Entity shapes (ShEx) for the entities in this question ---\n"
                 + "\n".join(state["shape"])
                 + "\n--- End entity shapes ---\n"
-                "\nIMPORTANT INSTRUCTIONS FOR SPARQL GENERATION:\n"
-                "- Only use properties that are explicitly listed in the entity shapes above.\n"
-                "- Do NOT invent properties. Use only what appears in the shape.\n"
-                "- dcterms:subject ONLY links to Category: resources (e.g. dbc:Presidents_of_the_United_States). NEVER use dcterms:subject with a regular resource.\n"
-                "- To find entities related to another entity, follow the property FROM that entity (e.g. dbr:Vietnam_War dbo:commander ?uri).\n"
-                "- To filter by type of person, prefer dcterms:subject with a Category over rdf:type with an ontology class.\n"
             ))
             chat_history = list(state['chat_history']) + [shape_message]
 
@@ -200,13 +205,12 @@ class LLMAgentDBpedia:
         return {
             "past_steps": [task, agent_response["output"]],
             "intermediate_steps": [task, agent_response["intermediate_steps"]],
-            "gave_feedback": state["gave_feedback"]
         }
 
     def _execute_step(self, state: PlanExecute):
         logging.info(f"{MAGENTA}[execute_step]{RESET}")
         logging.info(f"{MAGENTA}Current state: {state}{RESET}")
-        if state["gave_feedback"]:
+        if state["feedback_count"] > 0:
             task = state["feedback_task"]
         else:
             task = state["plan"].pop(0)
@@ -221,23 +225,30 @@ class LLMAgentDBpedia:
         return {
             "past_steps": [task, agent_response["output"]],
             "intermediate_steps": [task, agent_response["intermediate_steps"]],
-            "gave_feedback": state["gave_feedback"]
         }
 
     def _feedback_step(self, state: PlanExecute):
         logging.info(f"{MAGENTA}[feedback_step]{RESET}")
         task = feedback_step_dict[self.lang]
+        last_query_valid = False
         try:
             feedback = execute(query=state['chat_history'][-1].content, endpoint_url=self.sparql_endpoint)
             logging.info(f"{MAGENTA}Execution feedback: {feedback}{RESET}")
             if type(feedback) == dict and "error" not in feedback.keys():
-                feedback = json.dumps(feedback['results']['bindings'][:3])
+                bindings = feedback['results']['bindings'][:3]
+                if len(bindings) == 0:
+                    feedback = "The query executed successfully but returned EMPTY results. The query is likely incorrect. You MUST revise it to return actual results."
+                else:
+                    feedback = json.dumps(bindings)
+                    last_query_valid = True
         except Exception as e:
             feedback = str(e)
-        
+
+        logging.info(f"{MAGENTA}[feedback_step] valid={last_query_valid}, count={state['feedback_count'] + 1}{RESET}")
         return {
             "feedback_task": str(task.format(question=state["input"], query=state['chat_history'][-1].content, feedback=feedback, last_task=last_task[self.lang])),
-            "gave_feedback": True
+            "feedback_count": state["feedback_count"] + 1,
+            "last_query_valid": last_query_valid,
         }
     
     def _eat_step(self, state: PlanExecute):
@@ -248,20 +259,53 @@ class LLMAgentDBpedia:
         except Exception as e:
             pass
 
+        return {}
+
+    def _filter_ancestor_props(self, question, all_raw_props):
+        all_prop_names = list(dict.fromkeys(
+            prop_name
+            for _, (_, props) in all_raw_props.items()
+            for _, prop_name, _, _ in props
+        ))
+        if not all_prop_names:
+            return all_raw_props
+
+        prompt = (
+            f'Question: "{question}"\n\n'
+            f'Available DBpedia properties from ancestor classes:\n'
+            f'{", ".join(all_prop_names)}\n\n'
+            f'Return only the property names relevant to answering this question, '
+            f'as a comma-separated list. No explanation.'
+        )
+        try:
+            response = self.llm_shapes.invoke(prompt)
+            selected = {name.strip() for name in response.content.split(",")}
+            logging.info(f"{MAGENTA}[shaper_step] LLM selected props: {selected}{RESET}")
+        except Exception:
+            selected = set(all_prop_names)
+
         return {
-            "gave_feedback": state["gave_feedback"]
+            label: (class_uri, [(a, p, u, r) for a, p, u, r in props if p in selected])
+            for label, (class_uri, props) in all_raw_props.items()
         }
 
     def _shaper_step(self, state: PlanExecute):
         logging.info(f"{MAGENTA}[shaper_step]{RESET}")
 
         entities = extract_entities(state['input'], self.entities_llm)
-        shape = generate_shape(entities)
+        shape, ontology_classes = generate_shex_only(self.sparql_endpoint, entities)
 
-        return {
-            "shape": [shape] if shape else [],
-            "gave_feedback": state["gave_feedback"]
-        }
+        if shape and ontology_classes:
+            all_raw_props = {
+                label: (class_uri, get_raw_ancestor_props(class_uri, self.sparql_endpoint))
+                for label, class_uri in ontology_classes.items()
+            }
+            filtered = self._filter_ancestor_props(state['input'], all_raw_props)
+            for label, (class_uri, props) in filtered.items():
+                shape = append_ancestor_props_with_values(shape, props, label, self.sparql_endpoint)
+
+        logging.info(f"{MAGENTA}[shaper_step] Shape: {shape}{RESET}")
+        return {"shape": [shape] if shape else []}
     
     def _init_workflow(self):
         workflow = StateGraph(PlanExecute)
@@ -289,30 +333,45 @@ class LLMAgentDBpedia:
 
         workflow.add_conditional_edges(
             "agent",
-            # Next, we pass in the function that will determine which node is called next.
             self._feedback_router,
             {
                 "feedback": "feedback",
                 "agent": "agent",
-                END: END
             }
         )
 
-        # From feedback we go to agent
-        workflow.add_edge("feedback", "agent")
+        workflow.add_conditional_edges(
+            "feedback",
+            self._post_feedback_router,
+            {
+                "agent": "agent",
+                END: END,
+            }
+        )
 
 
         self.app = workflow.compile()
 
         return True
 
+    MAX_FEEDBACK = 3
+
     def _feedback_router(self, state: PlanExecute):
+        """Called after agent step: continue plan execution, or kick off feedback."""
         if len(state["plan"]) > 0:
             return "agent"
-        if len(state["plan"]) == 0 and state["gave_feedback"] == False:
-            return "feedback"
-        if len(state["plan"]) == 0 and state["gave_feedback"] == True:
+        return "feedback"
+
+    def _post_feedback_router(self, state: PlanExecute):
+        """Called after feedback step: stop if valid or max retries reached, else retry."""
+        if state["last_query_valid"]:
+            logging.info(f"{MAGENTA}[post_feedback_router] Query valid — stopping.{RESET}")
             return END
+        if state["feedback_count"] >= self.MAX_FEEDBACK:
+            logging.info(f"{MAGENTA}[post_feedback_router] Max feedback rounds reached — stopping.{RESET}")
+            return END
+        logging.info(f"{MAGENTA}[post_feedback_router] Query invalid, retrying (attempt {state['feedback_count']}).{RESET}")
+        return "agent"
   
     def generate_sparql(self, input_question: str, log: bool = False) -> str:
         """
@@ -358,7 +417,8 @@ class LLMAgentDBpedia:
             agent_result = self.app.invoke(
                 {"input": translated_input_question, "chat_history": [SystemMessage(content=f"""{system_prompt[self.lang]}
                 {example}""")],
-                "gave_feedback": False,
+                "feedback_count": 0,
+                "last_query_valid": False,
                 "shape": []}
             )
         
