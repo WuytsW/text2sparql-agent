@@ -51,6 +51,16 @@ class LogLLMCallbackHandler(BaseCallbackHandler):
         with open(log_path, "w", encoding="utf-8") as f:
             json.dump(existing, f, indent=2, ensure_ascii=False)
 
+    def _format_messages(self, msgs):
+        lines = []
+        for grp in msgs:
+            for m in grp:
+                content = m["content"].replace("\n", " ").strip()
+                if len(content) > 1000:
+                    content = content[:1000] + "..."
+                lines.append(f"  [{m['type'].upper()}]: {content}")
+        return "\n".join(lines)
+
     def on_chat_model_start(self, serialized, _messages, **kwargs):
         self.call_count += 1
         if not self._enabled:
@@ -58,7 +68,8 @@ class LogLLMCallbackHandler(BaseCallbackHandler):
         model = serialized.get("kwargs", {}).get("model_name", "unknown")
         msgs = [[{"type": m.type, "content": m.content} for m in grp] for grp in _messages]
         self._log_entries.append({"call": self.call_count, "model": model, "messages": msgs})
-        logging.info(f"{BLUE}[LLM API call #{self.call_count}] model={model} \n messages={_messages}{RESET}")
+        formatted = self._format_messages(msgs)
+        logging.info(f"{BLUE}[LLM API call #{self.call_count}] model={model}\n{formatted}{RESET}")
 
     def on_llm_end(self, response, **kwargs):
         if not self._enabled:

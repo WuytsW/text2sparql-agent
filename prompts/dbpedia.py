@@ -19,6 +19,35 @@ exmaple1: "Which state of the USA has the highest population density?"
 result1: "U.S. state, area, population"""
 }
 
+class_instances_prompt = {
+    "en": """Determine if the term "{label}" refers to a specific named entity or a general class/type of things.
+
+A NAMED ENTITY is a unique, specific thing: a particular person, place, organization, creative work, etc.
+Examples: "Michael Jackson", "Eiffel Tower", "Apple Inc.", "Uzi"
+
+A CLASS/TYPE is a general category that many things can belong to.
+Examples: "Animal", "Country", "Musical Artist", "Film", "Weapon", "City"
+
+If "{label}" is a NAMED ENTITY, respond with exactly:
+ENTITY
+
+If "{label}" is a CLASS/TYPE, respond with exactly:
+CLASS
+<comma-separated list of 8 specific, well-known DBpedia resource names that are instances of this class, using underscores instead of spaces and proper DBpedia capitalization, relevant to the question: "{nlq}">
+
+Examples:
+"Michael Jackson" → ENTITY
+"Animal" → CLASS
+Woolly_mammoth, Tiger, African_elephant, Dodo, Lion, Wolf, Cheetah, Blue_whale"""
+}
+
+shape_selection_prompt = {
+    "en": """Given the folowing question: "{nlq}", and the following shape: "{shape}"
+    select the most relevant properties and classes from the shape that are likely to be useful for answering the question.
+    Return a comma-separated list of properties and classes from the shape that are relevant to the question. Only select properties and classes that are likely to be useful for answering the question. Do not select all properties, only the most relevant ones.
+    If the shape is empty, return an empty string."""
+}
+
 
 last_task = {
     "en": """Make sure that the query is formatted correctly. No extra text. No markdown. Just plain SPARQL query.

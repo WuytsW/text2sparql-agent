@@ -15,7 +15,7 @@ import os
 import json
 import logging
 from services.LogLLMCallbackHandler import LogLLMCallbackHandler
-from services.shape_generation import generate_shex_only, get_raw_ancestor_props, append_ancestor_props_with_values
+from services.shape_generation import generate_shape
 from services.entity_extraction import extract_entities
 
 from services.llm_utils import dbpedia_el, Plan, get_expected_answer_type
@@ -261,50 +261,13 @@ class LLMAgentDBpedia:
 
         return {}
 
-    def _filter_ancestor_props(self, question, all_raw_props):
-        all_prop_names = list(dict.fromkeys(
-            prop_name
-            for _, (_, props) in all_raw_props.items()
-            for _, prop_name, _, _ in props
-        ))
-        if not all_prop_names:
-            return all_raw_props
-
-        prompt = (
-            f'Question: "{question}"\n\n'
-            f'Available DBpedia properties from ancestor classes:\n'
-            f'{", ".join(all_prop_names)}\n\n'
-            f'Return only the property names relevant to answering this question, '
-            f'as a comma-separated list. No explanation.'
-        )
-        try:
-            response = self.llm_shapes.invoke(prompt)
-            selected = {name.strip() for name in response.content.split(",")}
-            logging.info(f"{MAGENTA}[shaper_step] LLM selected props: {selected}{RESET}")
-        except Exception:
-            selected = set(all_prop_names)
-
-        return {
-            label: (class_uri, [(a, p, u, r) for a, p, u, r in props if p in selected])
-            for label, (class_uri, props) in all_raw_props.items()
-        }
-
     def _shaper_step(self, state: PlanExecute):
         logging.info(f"{MAGENTA}[shaper_step]{RESET}")
 
         entities = extract_entities(state['input'], self.entities_llm)
-        shape, ontology_classes = generate_shex_only(self.sparql_endpoint, entities)
+        shape = generate_shape(state['input'], entities, self.llm_shapes, use_llm=False)
 
-        if shape and ontology_classes:
-            all_raw_props = {
-                label: (class_uri, get_raw_ancestor_props(class_uri, self.sparql_endpoint))
-                for label, class_uri in ontology_classes.items()
-            }
-            filtered = self._filter_ancestor_props(state['input'], all_raw_props)
-            for label, (class_uri, props) in filtered.items():
-                shape = append_ancestor_props_with_values(shape, props, label, self.sparql_endpoint)
-
-        logging.info(f"{MAGENTA}[shaper_step] Shape: {shape}{RESET}")
+        logging.info(f"{MAGENTA}[shaper_step] Shape: \n{shape}{RESET}")
         return {"shape": [shape] if shape else []}
     
     def _init_workflow(self):
@@ -354,7 +317,7 @@ class LLMAgentDBpedia:
 
         return True
 
-    MAX_FEEDBACK = 3
+    MAX_FEEDBACK = 5
 
     def _feedback_router(self, state: PlanExecute):
         """Called after agent step: continue plan execution, or kick off feedback."""
