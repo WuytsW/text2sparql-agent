@@ -97,7 +97,7 @@ def execute(query: str, endpoint_url: str = 'https://dbpedia.org/sparql'):
         query = '\n'.join([list(pref.values())[0] for pref in prefixes_list if list(pref.keys())[0] not in query_prefixes]) + '\n' + query
         
         sparql = SPARQLWrapper(endpoint_url)
-        sparql.timeout = 5
+        sparql.timeout = 20
         sparql.setQuery(query)
         sparql.setReturnFormat(JSON)
         response = sparql.query().convert()

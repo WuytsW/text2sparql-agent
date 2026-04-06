@@ -265,7 +265,7 @@ class LLMAgentDBpedia:
         logging.info(f"{MAGENTA}[shaper_step]{RESET}")
 
         entities = extract_entities(state['input'], self.entities_llm)
-        shape = generate_shape(state['input'], entities, self.llm_shapes, use_llm=False)
+        shape = generate_shape(state['input'], entities, self.llm_shapes, use_llm=True)
 
         logging.info(f"{MAGENTA}[shaper_step] Shape: \n{shape}{RESET}")
         return {"shape": [shape] if shape else []}

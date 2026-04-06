@@ -33,19 +33,28 @@ ENTITY
 
 If "{label}" is a CLASS/TYPE, respond with exactly:
 CLASS
-<comma-separated list of 8 specific, well-known DBpedia resource names that are instances of this class, using underscores instead of spaces and proper DBpedia capitalization, relevant to the question: "{nlq}">
 
 Examples:
 "Michael Jackson" → ENTITY
-"Animal" → CLASS
-Woolly_mammoth, Tiger, African_elephant, Dodo, Lion, Wolf, Cheetah, Blue_whale"""
+"Animal" → CLASS"""
 }
 
 shape_selection_prompt = {
     "en": """Given the folowing question: "{nlq}", and the following shape: "{shape}"
     select the most relevant properties and classes from the shape that are likely to be useful for answering the question.
     Return a comma-separated list of properties and classes from the shape that are relevant to the question. Only select properties and classes that are likely to be useful for answering the question. Do not select all properties, only the most relevant ones.
+    Keep the formatting of the properties and classes as they are in the shape (Example:  dbo:deathPlace -> dbo:Place). 
     If the shape is empty, return an empty string."""
+}
+
+shape_selection_prompt_per_entity = {
+    "en": """Given the question: "{nlq}", and the following properties for "{label}":
+
+{shape}
+
+Select only the most relevant properties needed to answer the question.
+Return a comma-separated list in the exact format shown (e.g. dbo:capital -> dbo:City).
+If none are relevant, return an empty string."""
 }
 
 
