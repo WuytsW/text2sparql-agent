@@ -25,7 +25,8 @@ from prompts.dbpedia import (
     system_prompt,
     last_task,
     planner_prompt_dct,
-    feedback_step_dict
+    feedback_step_dict,
+    answer_validation_prompt_dct
 )
 
 
@@ -239,8 +240,36 @@ class LLMAgentDBpedia:
                 if len(bindings) == 0:
                     feedback = "The query executed successfully but returned EMPTY results. The query is likely incorrect. You MUST revise it to return actual results."
                 else:
-                    feedback = json.dumps(bindings)
-                    last_query_valid = True
+                    results_json = json.dumps(bindings)
+                    try:
+                        validation_prompt = answer_validation_prompt_dct[self.lang].format(
+                            question=state["input"],
+                            query=state['chat_history'][-1].content,
+                            results=results_json,
+                        )
+                        validation_response = self.llm_execution_compact.invoke(
+                            [HumanMessage(content=validation_prompt)]
+                        ).content.strip()
+                        logging.info(f"{MAGENTA}[feedback_step] Validation response: {validation_response}{RESET}")
+
+                        if validation_response.upper().startswith("YES"):
+                            feedback = results_json
+                            last_query_valid = True
+                        else:
+                            reason = validation_response[validation_response.upper().find("NO") + 2:].lstrip(": ").strip()
+                            if not reason:
+                                reason = validation_response
+                            feedback = (
+                                f"The query returned results but they do NOT correctly answer the question: "
+                                f"{reason}. Revise the query."
+                            )
+                    except Exception as validation_error:
+                        logging.warning(
+                            f"{MAGENTA}[feedback_step] Answer validation failed ({validation_error}), "
+                            f"defaulting to trusting non-empty results.{RESET}"
+                        )
+                        feedback = results_json
+                        last_query_valid = True
         except Exception as e:
             feedback = str(e)
 

@@ -52,9 +52,17 @@ shape_selection_prompt_per_entity = {
 
 {shape}
 
-Select only the most relevant properties needed to answer the question.
+Select only the most relevant properties needed to answer the question. (If you are not sure about selecting a property, it's better to include it than to miss it. Altough, try to avoid including too many irrelevant properties as it may lead to slow query execution or empty results.)
 Return a comma-separated list in the exact format shown (e.g. dbo:capital -> dbo:City).
 If none are relevant, return an empty string."""
+}
+
+
+last_task = {
+    "en": """Make sure that the query is formatted correctly. No extra text. No markdown. Just plain SPARQL query.
+Determine whether to output a URI (SELECT ?uri), number (COUNT), date, boolean (ASK), string (SELECT ?label)
+DON'T USE "SERVICE wikibase:label"
+"""
 }
 
 
@@ -101,3 +109,30 @@ feedback_step_dict = {
     {last_task}
     """
   }
+
+answer_validation_prompt_dct = {
+    "en": """You are a SPARQL result validator.
+
+Given a natural language question, the SPARQL query that was executed, and the results returned by the triplestore, check whether the result structure is appropriate for the question.
+
+Question: {question}
+
+SPARQL Query:
+{query}
+
+Triplestore Results (JSON bindings):
+{results}
+
+Reply YES unless there is an obvious structural mismatch, for example:
+- The question asks for a count but the result contains URIs instead of a number
+- The question asks for a list of entities but the result contains only a boolean
+- The result is completely empty when the query should logically return something
+
+Do NOT reply NO based on the specific values returned, the size of the result set, or whether the query could have been written differently.
+
+Reply with exactly one of:
+  YES
+  NO: <brief one-sentence reason describing the structural mismatch>
+
+Do not output anything else."""
+}

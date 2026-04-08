@@ -326,5 +326,4 @@ def generate_shape(nlq: str, entity_labels: list, llm, use_llm: bool = False):
         return None
 
     result = "\n\n".join(sections)
-    logging.info(f"[generate_shape] Final shape:\n" + result)
     return result
