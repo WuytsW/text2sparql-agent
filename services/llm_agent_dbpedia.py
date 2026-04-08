@@ -74,7 +74,7 @@ class LLMAgentDBpedia:
         self.plan_llm = ChatOpenAI(
             model=model_name,
             temperature=0,
-            api_key=os.getenv("OPENROUTER_API_KEY"),
+            api_key=os.getenv("mKGQAgent_Run_no_changes"),
             base_url="https://openrouter.ai/api/v1",
         ).with_structured_output(Plan)
 
@@ -85,7 +85,7 @@ class LLMAgentDBpedia:
         # Choose the LLM that will drive the agent
         self.llm = ChatOpenAI(
             model=model_name,
-            api_key=os.getenv("OPENROUTER_API_KEY"),
+            api_key=os.getenv("mKGQAgent_Run_no_changes"),
             base_url="https://openrouter.ai/api/v1",
         )
 
@@ -107,6 +107,27 @@ class LLMAgentDBpedia:
         except Exception as e:
             plan = [last_task]
             return {"plan": plan}
+        
+    def _execute_step_compact(self, state: PlanExecute):
+        if state["gave_feedback"]:
+            task = state["feedback_task"]
+        else:
+            all_steps = list(state["plan"])
+            state["plan"].clear()
+            task = "Complete all of the following steps in order:\n" + "\n".join(f"{i+1}. {s}" for i, s in enumerate(all_steps))
+
+        try:
+            agent_response = self.agent_executor.invoke({"input": task, "chat_history": state['chat_history']})
+            state['chat_history'].append(AIMessage(agent_response['output'])) # update chat history
+        except Exception as e:
+            state['chat_history'].append(AIMessage(str(e)))
+            agent_response = {"output": str(e), "intermediate_steps": "No"}
+
+        return {
+            "past_steps": [task, agent_response["output"]],
+            "intermediate_steps": [task, agent_response["intermediate_steps"]],
+            "gave_feedback": state["gave_feedback"]
+        }   
         
     def _execute_step(self, state: PlanExecute):
         if state["gave_feedback"]:
