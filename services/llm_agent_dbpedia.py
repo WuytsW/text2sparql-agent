@@ -72,6 +72,18 @@ class LLMAgentDBpedia:
 
         ### START Initialize agent
         self.tools = tools
+        self.current_model = model_name
+        self.compact_mode = False
+
+        client = Client()
+        self.agent_prompt = client.pull_prompt("hwchase17/openai-functions-agent")
+
+        self._init_llms(model_name)
+        self.app = None
+
+        ### END Initialize agent
+
+    def _init_llms(self, model_name: str):
         self.plan_llm = ChatOpenAI(
             model=model_name,
             temperature=0,
@@ -79,27 +91,17 @@ class LLMAgentDBpedia:
             base_url="https://openrouter.ai/api/v1",
         ).with_structured_output(Plan)
 
-        
-        client = Client()
-        prompt = client.pull_prompt("hwchase17/openai-functions-agent")
-
-        # Choose the LLM that will drive the agent
         self.llm = ChatOpenAI(
             model=model_name,
             api_key=os.getenv("mKGQAgent_Run_no_changes"),
             base_url="https://openrouter.ai/api/v1",
         )
 
-        # Construct the OpenAI Functions agent
-        self.agent_runnable = create_tool_calling_agent(self.llm, tools, prompt)
-
+        self.agent_runnable = create_tool_calling_agent(self.llm, self.tools, self.agent_prompt)
         self.agent_executor = AgentExecutor(
-            agent=self.agent_runnable, tools=tools, verbose=True, return_intermediate_steps=True
+            agent=self.agent_runnable, tools=self.tools, verbose=False, return_intermediate_steps=True
         )
-
-        self.app = None
-
-        ### EMD Initialize agent
+        self.current_model = model_name
 
     def _plan_step(self, state: PlanExecute):
         try:
@@ -110,6 +112,7 @@ class LLMAgentDBpedia:
             return {"plan": plan}
         
     def _execute_step_compact(self, state: PlanExecute):
+        print("Compact")
         if state["gave_feedback"]:
             task = state["feedback_task"]
         else:
@@ -130,7 +133,8 @@ class LLMAgentDBpedia:
             "gave_feedback": state["gave_feedback"]
         }   
         
-    def _execute_step(self, state: PlanExecute):
+    def _execute_step_original(self, state: PlanExecute):
+        print("Original")
         if state["gave_feedback"]:
             task = state["feedback_task"]
         else:
@@ -184,7 +188,8 @@ class LLMAgentDBpedia:
         workflow.add_node("eat", self._eat_step)
 
         # Add the execution step
-        workflow.add_node("agent", self._execute_step)
+        execute_fn = self._execute_step_compact if self.compact_mode else self._execute_step_original
+        workflow.add_node("agent", execute_fn)
 
         # Add the feedback step
         workflow.add_node("feedback", self._feedback_step)
@@ -222,18 +227,24 @@ class LLMAgentDBpedia:
         if len(state["plan"]) == 0 and state["gave_feedback"] == True:
             return END
   
-    def generate_sparql(self, input_question: str) -> str:
+    def generate_sparql(self, input_question: str, model_name: str = "openai/gpt-4o-mini", compact: bool = False) -> dict:
         """
-        Convert a natural language question to a SPARQL query
-        
+        Convert a natural language question to a SPARQL query.
+
         Args:
-            question: The natural language question
-            dataset: The dataset URL to query against
-            
+            input_question: The natural language question
+            model_name: OpenRouter model identifier (e.g. "openai/gpt-4o-mini")
+            compact: If True, execute all plan steps in a single agent call
+
         Returns:
-            A SPARQL query string
+            Dict with query, prompt_tokens, completion_tokens, requests
         """
         try:
+            if model_name != self.current_model or compact != self.compact_mode:
+                self._init_llms(model_name)
+                self.compact_mode = compact
+                self.app = None
+
             if self.app is None:
                 self._init_workflow()
 
