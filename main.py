@@ -37,16 +37,19 @@ async def get_answer(question: str, dataset: str):
         raise HTTPException(status_code=404, detail="Unknown dataset. Please use one of the known datasets.")
     
     if "dbpedia" in dataset:
-        sparql_query = dbpedia_agent.generate_sparql(question)
+        result = dbpedia_agent.generate_sparql(question)
     #elif "corporate" in dataset:
-       # sparql_query = corporate_agent.generate_sparql(question)
+       # result = corporate_agent.generate_sparql(question)
     else:
         raise HTTPException(status_code=404, detail="Unknown dataset. Please use one of the known datasets.")
-    
+
     return {
         "dataset": dataset,
         "question": question,
-        "query": sparql_query
+        "query": result["query"],
+        "tokens": result["tokens"],
+        "requests": result["requests"],
+        "cost": result["cost"],
     }
 
 if __name__ == "__main__":

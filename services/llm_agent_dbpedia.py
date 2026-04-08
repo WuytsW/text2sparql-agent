@@ -5,6 +5,7 @@ from langgraph.graph import StateGraph, END
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
+from langchain_community.callbacks import get_openai_callback
 from dotenv import load_dotenv
 
 
@@ -251,29 +252,37 @@ class LLMAgentDBpedia:
         Output: {sparql}
 
         """
-                
+
                 example += "--- End example ---"
 
-            agent_result = self.app.invoke(
-                {"input": input_question, "chat_history": [SystemMessage(content=f"""{system_prompt[self.lang]}      
-                {example}""")],
-                "gave_feedback": False}
-            )
-        
+            with get_openai_callback() as cb:
+                agent_result = self.app.invoke(
+                    {"input": input_question, "chat_history": [SystemMessage(content=f"""{system_prompt[self.lang]}
+                    {example}""")],
+                    "gave_feedback": False}
+                )
+
             sparql_result = agent_result['chat_history'][-1].content
 
             logging.info(f"Generated SPARQL query: {sparql_result}")
 
             generated_query = post_process(sparql_result)
 
-            return generated_query
+            return {
+                "query": generated_query,
+                "prompt_tokens": cb.prompt_tokens,
+                "completion_tokens": cb.completion_tokens,
+                "requests": cb.successful_requests
+            }
+        
         except Exception as e:
             logging.error(f"Error in generate_sparql: {e}")
-            return """SELECT ?s ?p ?o
-WHERE {
-    ?s ?p ?o
-}
-LIMIT 10"""
+            return {
+                "query": "SELECT ?s ?p ?o WHERE { ?s ?p ?o } LIMIT 10",
+                "prompt_tokens":0,
+                "completion_tokens": 0,
+                "requests": 0
+            }
 
 
 
