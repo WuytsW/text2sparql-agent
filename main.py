@@ -22,34 +22,43 @@ dbpedia_agent = LLMAgentDBpedia()
 #corporate_agent = LLMAgentCorporate()
 
 @app.get("/api")
-async def get_answer(question: str, dataset: str):
+async def get_answer(
+    question: str,
+    dataset: str,
+    model_name: str = "openai/gpt-4o-mini",
+    compact: bool = False,
+):
     """
     Process a natural language question and convert it to SPARQL query for the specified dataset.
-    
+
     Args:
         question: The natural language question to process
         dataset: The dataset URL to query against
-        
+        model_name: OpenRouter model identifier (default: openai/gpt-4o-mini)
+        compact: If True, execute all plan steps in a single agent call (default: False)
+
     Returns:
-        JSON with the dataset, original question, and generated SPARQL query
+        JSON with the dataset, original question, generated SPARQL query, and LLM usage stats
     """
     if dataset not in KNOWN_DATASETS:
         raise HTTPException(status_code=404, detail="Unknown dataset. Please use one of the known datasets.")
-    
+
     if "dbpedia" in dataset:
-        result = dbpedia_agent.generate_sparql(question)
+        result = dbpedia_agent.generate_sparql(question, model_name=model_name, compact=compact)
     #elif "corporate" in dataset:
-       # result = corporate_agent.generate_sparql(question)
+       # result = corporate_agent.generate_sparql(question, model_name=model_name, compact=compact)
     else:
         raise HTTPException(status_code=404, detail="Unknown dataset. Please use one of the known datasets.")
 
     return {
         "dataset": dataset,
         "question": question,
+        "model_name": model_name,
+        "compact": compact,
         "query": result["query"],
-        "tokens": result["tokens"],
+        "prompt_tokens": result["prompt_tokens"],
+        "completion_tokens": result["completion_tokens"],
         "requests": result["requests"],
-        "cost": result["cost"],
     }
 
 if __name__ == "__main__":
