@@ -7,7 +7,8 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from langchain_community.callbacks import get_openai_callback
 from dotenv import load_dotenv
-
+from services.log_utils.LogLLMCallbackHandler import LogLLMCallbackHandler
+from services.log_utils.log import log_message
 
 from typing import List
 
@@ -80,6 +81,7 @@ class LLMAgentDBpedia:
 
         self._init_llms(model_name)
         self.app = None
+        self.log_handler = LogLLMCallbackHandler()
 
         ### END Initialize agent
 
@@ -106,6 +108,7 @@ class LLMAgentDBpedia:
     def _plan_step(self, state: PlanExecute):
         try:
             plan = self.plan_llm.invoke(planner_prompt_dct[self.lang].format(objective=state["input"]))
+            log_message(step_name="Planning", color="Magenta", messages=[plan.steps])
             return {"plan": plan.steps + [last_task]}
         except Exception as e:
             plan = [last_task]
@@ -119,6 +122,8 @@ class LLMAgentDBpedia:
             all_steps = list(state["plan"])
             state["plan"].clear()
             task = "Complete all of the following steps in order:\n" + "\n".join(f"{i+1}. {s}" for i, s in enumerate(all_steps))
+        
+        log_message(step_name="Execute (Compact) task", color="Magenta", messages=[task])
 
         try:
             agent_response = self.agent_executor.invoke({"input": task, "chat_history": state['chat_history']})
@@ -126,6 +131,8 @@ class LLMAgentDBpedia:
         except Exception as e:
             state['chat_history'].append(AIMessage(str(e)))
             agent_response = {"output": str(e), "intermediate_steps": "No"}
+
+        log_message(step_name="Execute (Compact) response", color="Magenta", messages=[agent_response["output"]])
 
         return {
             "past_steps": [task, agent_response["output"]],
@@ -140,12 +147,16 @@ class LLMAgentDBpedia:
         else:
             task = state["plan"].pop(0)
 
+        log_message(step_name="Execute (Original) task", color="Magenta", messages=[task])
+
         try:
             agent_response = self.agent_executor.invoke({"input": task, "chat_history": state['chat_history']})
             state['chat_history'].append(AIMessage(agent_response['output'])) # update chat history
         except Exception as e:
             state['chat_history'].append(AIMessage(str(e)))
             agent_response = {"output": str(e), "intermediate_steps": "No"}
+
+        log_message(step_name="Execute (Original) response", color="Magenta", messages=[agent_response["output"]])
 
         return {
             "past_steps": [task, agent_response["output"]],
@@ -162,6 +173,8 @@ class LLMAgentDBpedia:
         except Exception as e:
             feedback = str(e)
         
+        log_message(step_name="Feedback", color="Magenta", messages=[feedback])
+
         return {
             "feedback_task": str(task.format(question=state["input"], query=state['chat_history'][-1].content, feedback=feedback, last_task=last_task)),
             "gave_feedback": True
@@ -170,9 +183,12 @@ class LLMAgentDBpedia:
     def _eat_step(self, state: PlanExecute):
         try:
             expected_answer_type = get_expected_answer_type(state['input'], self.llm)
+
+            log_message(step_name="eat", color="Magenta", messages=[expected_answer_type["expected_answer_type"]["eat"]])
+
             state['chat_history'].append(AIMessage(expected_answer_type["expected_answer_type"]["eat"])) # update chat history
         except Exception as e:
-            pass
+            log_message(step_name="eat", color="Magenta", messages=[str(e)])
 
         return {
             "gave_feedback": state["gave_feedback"]
@@ -227,7 +243,7 @@ class LLMAgentDBpedia:
         if len(state["plan"]) == 0 and state["gave_feedback"] == True:
             return END
   
-    def generate_sparql(self, input_question: str, model_name: str = "openai/gpt-4o-mini", compact: bool = False) -> dict:
+    def generate_sparql(self, input_question: str, model_name: str = "openai/gpt-4o-mini", compact: bool = False, log_calls: bool = False) -> dict:
         """
         Convert a natural language question to a SPARQL query.
 
@@ -235,6 +251,7 @@ class LLMAgentDBpedia:
             input_question: The natural language question
             model_name: OpenRouter model identifier (e.g. "openai/gpt-4o-mini")
             compact: If True, execute all plan steps in a single agent call
+            log_calls: If True, log LLM calls
 
         Returns:
             Dict with query, prompt_tokens, completion_tokens, requests
@@ -266,11 +283,13 @@ class LLMAgentDBpedia:
 
                 example += "--- End example ---"
 
+            self.log_handler.reset(input_question, enabled=log_calls)
             with get_openai_callback() as cb:
                 agent_result = self.app.invoke(
                     {"input": input_question, "chat_history": [SystemMessage(content=f"""{system_prompt[self.lang]}
                     {example}""")],
-                    "gave_feedback": False}
+                    "gave_feedback": False},
+                    config={"callbacks": [self.log_handler]}
                 )
 
             sparql_result = agent_result['chat_history'][-1].content
@@ -278,6 +297,7 @@ class LLMAgentDBpedia:
             logging.info(f"Generated SPARQL query: {sparql_result}")
 
             generated_query = post_process(sparql_result)
+            self.log_handler._flush_to_file(generated_query)
 
             return {
                 "query": generated_query,

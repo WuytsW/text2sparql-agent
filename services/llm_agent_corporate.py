@@ -6,6 +6,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from dotenv import load_dotenv
+from services.log_utils.LogLLMCallbackHandler import LogLLMCallbackHandler
 
 
 from typing import List
@@ -96,6 +97,7 @@ class LLMAgentCorporate:
         )
 
         self.app = None
+        self.log_handler = LogLLMCallbackHandler()
 
         ### EMD Initialize agent
 
@@ -184,7 +186,7 @@ class LLMAgentCorporate:
         if len(state["plan"]) == 0 and state["gave_feedback"] == True:
             return END
   
-    def generate_sparql(self, input_question: str) -> str:
+    def generate_sparql(self, input_question: str, log_calls: bool = False) -> str:
         """
         Convert a natural language question to a SPARQL query
         
@@ -217,15 +219,18 @@ class LLMAgentCorporate:
                 
                 example += "--- End example ---"
 
+            self.log_handler.reset(input_question, enabled=log_calls)
             agent_result = self.app.invoke(
-                {"input": input_question, "chat_history": [SystemMessage(content=f"""{system_prompt[self.lang]}      
+                {"input": input_question, "chat_history": [SystemMessage(content=f"""{system_prompt[self.lang]}
                 {example}""")],
-                "gave_feedback": False}
+                "gave_feedback": False},
+                config={"callbacks": [self.log_handler]}
             )
-        
+
             sparql_result = agent_result['chat_history'][-1].content
 
             generated_query = post_process(sparql_result)
+            self.log_handler._flush_to_file(generated_query)
 
             return generated_query
         except Exception as e:
