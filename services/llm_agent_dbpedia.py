@@ -16,7 +16,7 @@ import os
 import json
 import logging
 
-from services.llm_utils import dbpedia_el, Plan, get_expected_answer_type
+from services.llm_utils import dbpedia_el, Plan, get_expected_answer_type, extract_entities_tool, generate_shape_tool
 from services.ld_utils import execute, post_process
 from model.agent import PlanExecute
 from prompts.dbpedia import (
@@ -38,7 +38,7 @@ class LLMAgentDBpedia:
             model_name: str = "openai/gpt-4o-mini",
             embedding_model_name: str = "intfloat/multilingual-e5-large",
             return_N: int = 5,
-            tools: List = [dbpedia_el],
+            tools: List = [extract_entities_tool, generate_shape_tool],
             lang: str = "en"
         ):
 
@@ -93,16 +93,43 @@ class LLMAgentDBpedia:
             base_url="https://openrouter.ai/api/v1",
         ).with_structured_output(Plan)
 
-        self.llm = ChatOpenAI(
+        self.llm_eat = ChatOpenAI(
             model=model_name,
-            api_key=os.getenv("mKGQAgent_Run_no_changes"),
-            base_url="https://openrouter.ai/api/v1",
+            api_key=os.getenv("mKGQAgent_EAT_LLM"),
+            base_url="https://openrouter.ai/api/v1"
         )
 
-        self.agent_runnable = create_tool_calling_agent(self.llm, self.tools, self.agent_prompt)
-        self.agent_executor = AgentExecutor(
-            agent=self.agent_runnable, tools=self.tools, verbose=False, return_intermediate_steps=True
+        self.llm_execution_original = ChatOpenAI(
+            model=model_name,
+            api_key=os.getenv("mKGQAgent_Execution_original_LLM"),
+            base_url="https://openrouter.ai/api/v1"
         )
+
+        self.llm_execution_compact = ChatOpenAI(
+            model=model_name,
+            api_key=os.getenv("mKGQAgent_Execution_compact_LLM"),
+            base_url="https://openrouter.ai/api/v1"
+        )
+
+        self.entities_llm = ChatOpenAI(
+            model=model_name,
+            api_key=os.getenv("mKGQAgent_Entities_LLM"),
+            base_url="https://openrouter.ai/api/v1",
+            temperature=0.2,
+            max_tokens=50,
+        )
+
+        
+
+        self.agent_runnable_execution_original = create_tool_calling_agent(self.llm_execution_original, self.tools, self.agent_prompt)
+        self.agent_runnable_execution_compact = create_tool_calling_agent(self.llm_execution_compact, self.tools, self.agent_prompt)
+        self.agent_executor_original = AgentExecutor(
+            agent=self.agent_runnable_execution_original, tools=self.tools, verbose=False, return_intermediate_steps=True
+        )
+        self.agent_executor_compact = AgentExecutor(
+            agent=self.agent_runnable_execution_compact, tools=self.tools, verbose=False, return_intermediate_steps=True
+        )
+
         self.current_model = model_name
 
     def _plan_step(self, state: PlanExecute):
@@ -126,7 +153,7 @@ class LLMAgentDBpedia:
         log_message(step_name="Execute (Compact) task", color="Magenta", messages=[task])
 
         try:
-            agent_response = self.agent_executor.invoke({"input": task, "chat_history": state['chat_history']})
+            agent_response = self.agent_executor_compact.invoke({"input": task, "chat_history": state['chat_history']})
             state['chat_history'].append(AIMessage(agent_response['output'])) # update chat history
         except Exception as e:
             state['chat_history'].append(AIMessage(str(e)))
@@ -145,12 +172,12 @@ class LLMAgentDBpedia:
         if state["gave_feedback"]:
             task = state["feedback_task"]
         else:
-            task = state["plan"].pop(0)
+            task = f"User question: {state['input']}\n\nTask: {state['plan'].pop(0)}"
 
         log_message(step_name="Execute (Original) task", color="Magenta", messages=[task])
 
         try:
-            agent_response = self.agent_executor.invoke({"input": task, "chat_history": state['chat_history']})
+            agent_response = self.agent_executor_original.invoke({"input": task, "chat_history": state['chat_history']})
             state['chat_history'].append(AIMessage(agent_response['output'])) # update chat history
         except Exception as e:
             state['chat_history'].append(AIMessage(str(e)))
@@ -182,7 +209,7 @@ class LLMAgentDBpedia:
     
     def _eat_step(self, state: PlanExecute):
         try:
-            expected_answer_type = get_expected_answer_type(state['input'], self.llm)
+            expected_answer_type = get_expected_answer_type(state['input'], self.llm_eat)
 
             log_message(step_name="eat", color="Magenta", messages=[expected_answer_type["expected_answer_type"]["eat"]])
 

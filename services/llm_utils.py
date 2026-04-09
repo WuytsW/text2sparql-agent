@@ -10,6 +10,8 @@ from typing import List
 from pydantic import BaseModel, Field
 from langchain.tools import tool
 
+from services.shape_generation import generate_shape
+
 
 
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
@@ -40,6 +42,19 @@ class NELInput(BaseModel):
 
 class RELInput(BaseModel):
     rel_list: list = Field(description="should be a list of relations (strings) to be linked to the Knowledge Graph  URIs")
+
+class ShapeInput(BaseModel):
+    nlq: str = Field(description="The user's natural language question")
+    entity_labels: list[str] = Field(
+        description="List of DBpedia class or entity labels to generate shapes for, e.g. ['Germany'] or ['Scientist']"
+    )
+    use_llm: bool = Field(
+        default=False,
+        description="Whether to let the LLM filter the generated shape to only relevant parts"
+    )
+
+class EntityExtractionInput(BaseModel):
+    nlq: str = Field(description="The user's natural language question to extract entities from")
 
 def falcon_external(text: str):
     url = 'https://labs.tib.eu/falcon/falcon2/api'
@@ -87,6 +102,50 @@ def dbpedia_el(ne_list: list) -> list:
         nel_list += relations
         
     return nel_list
+
+@tool("extract_entities_tool", args_schema=EntityExtractionInput)
+def extract_entities_tool(nlq: str) -> list[str]:
+    """
+    Extract named entities and classes from a natural language question.
+    Returns a list of entity/class label strings (e.g. ['Germany', 'Scientist']).
+    Call this before generate_shape_tool to determine which entities to generate shapes for.
+    """
+    from langchain_openai import ChatOpenAI
+    from services.entity_extraction import extract_entities
+
+    llm_entities = ChatOpenAI(
+        model="openai/gpt-4o-mini",
+        api_key=os.getenv("mKGQAgent_Entities_LLM"),
+        base_url="https://openrouter.ai/api/v1",
+        temperature=0.2,
+        max_tokens=50,
+    )
+
+    return extract_entities(nlq, llm_entities)
+
+
+@tool("generate_shape_tool", args_schema=ShapeInput)
+def generate_shape_tool(nlq: str, entity_labels: list[str], use_llm: bool = False) -> str:
+    """
+    Generate a DBpedia-oriented shape description for the given entity/class labels.
+    Returns a text block with relevant properties and, when possible, controlled values.
+    """
+    from langchain_openai import ChatOpenAI
+
+    llm_shapes = ChatOpenAI(
+        model="openai/gpt-4o-mini",
+        api_key=os.getenv("mKGQAgent_Shapes_LLM"),
+        base_url="https://openrouter.ai/api/v1"
+    )
+
+    result = generate_shape(
+        nlq=nlq,
+        entity_labels=entity_labels,
+        shapes_llm=llm_shapes,
+        use_llm=use_llm,
+    )
+
+    return result or "No shape could be generated."
 
 def get_corporate_entities(query: str, is_relation: bool) -> list:
     """
