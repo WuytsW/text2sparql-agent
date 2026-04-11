@@ -7,7 +7,9 @@ langchain-core
 langchain-openai
 langchain
 langchain-community
+langchain-huggingface
 fuzzywuzzy
+python-Levenshtein
 SPARQLWrapper
 rdflib
 sentence-transformers

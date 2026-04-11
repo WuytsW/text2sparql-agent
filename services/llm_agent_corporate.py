@@ -3,7 +3,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, AIMessage
 from langgraph.graph import StateGraph, END
 from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from dotenv import load_dotenv
 from services.log_utils.LogLLMCallbackHandler import LogLLMCallbackHandler
@@ -50,7 +50,7 @@ class LLMAgentCorporate:
         self.model_name = model_name
 
         ### START Initialize embeddings
-        model_kwargs = {'device': 'cpu'}
+        model_kwargs = {'device': 'cpu', 'model_kwargs': {'use_safetensors': False}}
         encode_kwargs = {'normalize_embeddings': False}
         self.hf_embeddings = HuggingFaceEmbeddings(
             model_name=self.embedding_model_name,
