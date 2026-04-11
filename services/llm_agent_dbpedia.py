@@ -1,14 +1,15 @@
 from langsmith import Client
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage, AIMessage
+from langchain_core.messages import SystemMessage, AIMessage, HumanMessage, ToolMessage
 from langgraph.graph import StateGraph, END
 from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from langchain_community.callbacks import get_openai_callback
 from dotenv import load_dotenv
 from services.log_utils.LogLLMCallbackHandler import LogLLMCallbackHandler
 from services.log_utils.log import log_message
+from services.translate import translate_question
 
 from typing import List
 
@@ -16,7 +17,7 @@ import os
 import json
 import logging
 
-from services.llm_utils import dbpedia_el, Plan, get_expected_answer_type, extract_entities_tool, generate_shape_tool
+from services.llm_utils import dbpedia_el, Plan, get_expected_answer_type, make_extract_entities_tool, make_generate_shape_tool
 from services.ld_utils import execute, post_process
 from model.agent import PlanExecute
 from prompts.dbpedia import (
@@ -38,7 +39,7 @@ class LLMAgentDBpedia:
             model_name: str = "openai/gpt-4o-mini",
             embedding_model_name: str = "intfloat/multilingual-e5-large",
             return_N: int = 5,
-            tools: List = [extract_entities_tool, generate_shape_tool],
+            tools: List = [dbpedia_el],
             lang: str = "en"
         ):
 
@@ -51,7 +52,7 @@ class LLMAgentDBpedia:
         self.model_name = model_name
 
         ### START Initialize embeddings
-        model_kwargs = {'device': 'cpu'}
+        model_kwargs = {'device': 'cpu', 'model_kwargs': {'use_safetensors': False}}
         encode_kwargs = {'normalize_embeddings': False}
         self.hf_embeddings = HuggingFaceEmbeddings(
             model_name=self.embedding_model_name,
@@ -72,7 +73,7 @@ class LLMAgentDBpedia:
         ### END Load ICL VDB
 
         ### START Initialize agent
-        self.tools = tools
+        self._base_tools = tools  # static tools without LLM dependency
         self.current_model = model_name
         self.compact_mode = False
 
@@ -119,7 +120,22 @@ class LLMAgentDBpedia:
             max_tokens=50,
         )
 
-        
+        self.shapes_llm = ChatOpenAI(
+            model=model_name,
+            api_key=os.getenv("mKGQAgent_Shapes_LLM"),
+            base_url="https://openrouter.ai/api/v1",
+        )
+
+        self.translation_llm = ChatOpenAI(
+            model=model_name,
+            api_key=os.getenv("mKGQAgent_Translation_LLM"),
+            base_url="https://openrouter.ai/api/v1",
+        )
+
+        self.tools = [
+            make_extract_entities_tool(self.entities_llm),
+            make_generate_shape_tool(self.shapes_llm),
+        ] + self._base_tools
 
         self.agent_runnable_execution_original = create_tool_calling_agent(self.llm_execution_original, self.tools, self.agent_prompt)
         self.agent_runnable_execution_compact = create_tool_calling_agent(self.llm_execution_compact, self.tools, self.agent_prompt)
@@ -141,6 +157,28 @@ class LLMAgentDBpedia:
             plan = [last_task]
             return {"plan": plan}
         
+    def _append_tool_trace(self, state: PlanExecute, task: str, agent_response: dict):
+        """Append the full tool call trace from an AgentExecutor response to chat_history.
+
+        Adds: HumanMessage(task) → AIMessage(tool_calls) → ToolMessage(s) → AIMessage(output)
+        so that subsequent steps can see which tools were already called.
+        """
+        state['chat_history'].append(HumanMessage(task))
+
+        seen_msg_ids = set()
+        for action, observation in agent_response.get('intermediate_steps', []):
+            if hasattr(action, 'message_log'):
+                for msg in action.message_log:
+                    if id(msg) not in seen_msg_ids:
+                        seen_msg_ids.add(id(msg))
+                        state['chat_history'].append(msg)
+            if hasattr(action, 'tool_call_id'):
+                state['chat_history'].append(
+                    ToolMessage(content=str(observation), tool_call_id=action.tool_call_id)
+                )
+
+        state['chat_history'].append(AIMessage(agent_response['output']))
+
     def _execute_step_compact(self, state: PlanExecute):
         print("Compact")
         if state["gave_feedback"]:
@@ -149,15 +187,16 @@ class LLMAgentDBpedia:
             all_steps = list(state["plan"])
             state["plan"].clear()
             task = "Complete all of the following steps in order:\n" + "\n".join(f"{i+1}. {s}" for i, s in enumerate(all_steps))
-        
+
         log_message(step_name="Execute (Compact) task", color="Magenta", messages=[task])
 
         try:
             agent_response = self.agent_executor_compact.invoke({"input": task, "chat_history": state['chat_history']})
-            state['chat_history'].append(AIMessage(agent_response['output'])) # update chat history
+            self._append_tool_trace(state, task, agent_response)
         except Exception as e:
+            state['chat_history'].append(HumanMessage(task))
             state['chat_history'].append(AIMessage(str(e)))
-            agent_response = {"output": str(e), "intermediate_steps": "No"}
+            agent_response = {"output": str(e), "intermediate_steps": []}
 
         log_message(step_name="Execute (Compact) response", color="Magenta", messages=[agent_response["output"]])
 
@@ -165,8 +204,8 @@ class LLMAgentDBpedia:
             "past_steps": [task, agent_response["output"]],
             "intermediate_steps": [task, agent_response["intermediate_steps"]],
             "gave_feedback": state["gave_feedback"]
-        }   
-        
+        }
+
     def _execute_step_original(self, state: PlanExecute):
         print("Original")
         if state["gave_feedback"]:
@@ -178,10 +217,11 @@ class LLMAgentDBpedia:
 
         try:
             agent_response = self.agent_executor_original.invoke({"input": task, "chat_history": state['chat_history']})
-            state['chat_history'].append(AIMessage(agent_response['output'])) # update chat history
+            self._append_tool_trace(state, task, agent_response)
         except Exception as e:
+            state['chat_history'].append(HumanMessage(task))
             state['chat_history'].append(AIMessage(str(e)))
-            agent_response = {"output": str(e), "intermediate_steps": "No"}
+            agent_response = {"output": str(e), "intermediate_steps": []}
 
         log_message(step_name="Execute (Original) response", color="Magenta", messages=[agent_response["output"]])
 
@@ -203,7 +243,7 @@ class LLMAgentDBpedia:
         log_message(step_name="Feedback", color="Magenta", messages=[feedback])
 
         return {
-            "feedback_task": str(task.format(question=state["input"], query=state['chat_history'][-1].content, feedback=feedback, last_task=last_task)),
+            "feedback_task": str(task.format(question=state["input"], query=state['chat_history'][-1].content, feedback=feedback, last_task=last_task[self.lang])),
             "gave_feedback": True
         }
     
@@ -224,25 +264,18 @@ class LLMAgentDBpedia:
     def _init_workflow(self):
         workflow = StateGraph(PlanExecute)
 
-        # Add the plan node
-        workflow.add_node("planner", self._plan_step)
-
-        # Add the eat step
-        workflow.add_node("eat", self._eat_step)
-
-        # Add the execution step
+        # Select the execution step (compact or original based on self.compact_mode)
         execute_fn = self._execute_step_compact if self.compact_mode else self._execute_step_original
-        workflow.add_node("agent", execute_fn)
 
-        # Add the feedback step
+        workflow.add_node("planner", self._plan_step)
+        workflow.add_node("eat", self._eat_step)
+        workflow.add_node("agent", execute_fn)
         workflow.add_node("feedback", self._feedback_step)
 
+        # Define the edges between the nodes
         workflow.set_entry_point("planner")
-
-        # From plan we go to agent
         workflow.add_edge("planner", "eat")
         workflow.add_edge("eat", "agent")
-
         workflow.add_conditional_edges(
             "agent",
             # Next, we pass in the function that will determine which node is called next.
@@ -253,10 +286,7 @@ class LLMAgentDBpedia:
                 END: END
             }
         )
-
-        # From feedback we go to agent
         workflow.add_edge("feedback", "agent")
-
 
         self.app = workflow.compile()
 
@@ -270,6 +300,21 @@ class LLMAgentDBpedia:
         if len(state["plan"]) == 0 and state["gave_feedback"] == True:
             return END
   
+
+    def get_similar_examples(self, input_question: str):
+        results = self.icl_db.similarity_search_with_score(input_question, k=self.return_N)
+
+        example = "--- Successful example for in context learning ---"
+
+        for result in results[:self.return_N]:
+            idx = result[0].metadata['seq_num'] - 1
+            question = self.icl_json_data[idx]["question"]
+            sparql = self.icl_json_data[idx]["sparql"]
+            example += f"""\nInput: {question}\nOutput: {sparql}\n"""
+            example += "--- End example ---"
+        log_message(step_name="Similar examples retrieved for ICL", color="Cyan", messages=[example])
+        return example
+
     def generate_sparql(self, input_question: str, model_name: str = "openai/gpt-4o-mini", compact: bool = False, log_calls: bool = False) -> dict:
         """
         Convert a natural language question to a SPARQL query.
@@ -292,38 +337,24 @@ class LLMAgentDBpedia:
             if self.app is None:
                 self._init_workflow()
 
-            results = self.icl_db.similarity_search_with_score(input_question, k=self.return_N)
+            log_message(step_name="Input question", color="Yellow", messages=[input_question])
+            translated_question = translate_question(input_question, self.translation_llm)
+            log_message(step_name="Translated question", color="Yellow", messages=[translated_question])
 
-            example = "--- Successful example for in context learning ---"
-
-            for result in results[:self.return_N]:
-                idx = result[0].metadata['seq_num'] - 1
-                question = self.icl_json_data[idx]["question"]
-                sparql = self.icl_json_data[idx]["sparql"]
-
-                example += f"""
-
-        Input: {question}
-        Output: {sparql}
-
-        """
-
-                example += "--- End example ---"
-
-            self.log_handler.reset(input_question, enabled=log_calls)
+            self.log_handler.reset(translated_question, enabled=log_calls)
             with get_openai_callback() as cb:
                 agent_result = self.app.invoke(
-                    {"input": input_question, "chat_history": [SystemMessage(content=f"""{system_prompt[self.lang]}
-                    {example}""")],
+                    {"input": translated_question, "chat_history": [SystemMessage(content=f"""{system_prompt[self.lang]}
+                    {self.get_similar_examples(translated_question)}""")],
                     "gave_feedback": False},
                     config={"callbacks": [self.log_handler]}
                 )
 
             sparql_result = agent_result['chat_history'][-1].content
 
-            logging.info(f"Generated SPARQL query: {sparql_result}")
-
             generated_query = post_process(sparql_result)
+            log_message(step_name="Generated SPARQL query", color="Yellow", messages=[generated_query])
+
             self.log_handler._flush_to_file(generated_query)
 
             return {
@@ -361,4 +392,3 @@ if __name__ == "__main__":
         
     print(f"Input: {text}")
     print(f"Output: {query}")
-    

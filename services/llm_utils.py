@@ -9,6 +9,7 @@ from typing import List
 
 from pydantic import BaseModel, Field
 from langchain.tools import tool
+from services.log_utils.log import log_message
 
 from services.shape_generation import generate_shape
 
@@ -87,6 +88,7 @@ def wikidata_el(ne_list: list) -> list:
         nel_list += falcon_entities
         nel_list += relations
 
+    log_message(step_name="Entity linking candidates from Wikidata", color="Yellow", messages=[str(nel_list)])
     return nel_list
 
 @tool("dbpedia_el", args_schema=NELInput)
@@ -100,52 +102,45 @@ def dbpedia_el(ne_list: list) -> list:
         relations = falcon_result.get("relations_dbpedia", [])
         nel_list += entities
         nel_list += relations
-        
+
+    log_message(step_name="Entity linking candidates from DBpedia", color="Yellow", messages=[str(nel_list)])    
     return nel_list
 
-@tool("extract_entities_tool", args_schema=EntityExtractionInput)
-def extract_entities_tool(nlq: str) -> list[str]:
-    """
-    Extract named entities and classes from a natural language question.
-    Returns a list of entity/class label strings (e.g. ['Germany', 'Scientist']).
-    Call this before generate_shape_tool to determine which entities to generate shapes for.
-    """
-    from langchain_openai import ChatOpenAI
+def make_extract_entities_tool(llm):
+    """Factory that returns an extract_entities_tool bound to the given LLM."""
     from services.entity_extraction import extract_entities
 
-    llm_entities = ChatOpenAI(
-        model="openai/gpt-4o-mini",
-        api_key=os.getenv("mKGQAgent_Entities_LLM"),
-        base_url="https://openrouter.ai/api/v1",
-        temperature=0.2,
-        max_tokens=50,
-    )
+    @tool("extract_entities_tool", args_schema=EntityExtractionInput)
+    def extract_entities_tool(nlq: str) -> list[str]:
+        """
+        Extract named entities and classes from a natural language question.
+        Returns a list of entity/class label strings (e.g. ['Germany', 'Scientist']).
+        Call this before generate_shape_tool to determine which entities to generate shapes for.
+        """
+        return extract_entities(nlq, llm)
 
-    return extract_entities(nlq, llm_entities)
+    return extract_entities_tool
 
 
-@tool("generate_shape_tool", args_schema=ShapeInput)
-def generate_shape_tool(nlq: str, entity_labels: list[str], use_llm: bool = False) -> str:
-    """
-    Generate a DBpedia-oriented shape description for the given entity/class labels.
-    Returns a text block with relevant properties and, when possible, controlled values.
-    """
-    from langchain_openai import ChatOpenAI
+def make_generate_shape_tool(llm):
+    """Factory that returns a generate_shape_tool bound to the given LLM."""
 
-    llm_shapes = ChatOpenAI(
-        model="openai/gpt-4o-mini",
-        api_key=os.getenv("mKGQAgent_Shapes_LLM"),
-        base_url="https://openrouter.ai/api/v1"
-    )
+    @tool("generate_shape_tool", args_schema=ShapeInput)
+    def generate_shape_tool(nlq: str, entity_labels: list[str], use_llm: bool = False) -> str:
+        """
+        Generate a DBpedia-oriented shape description for the given entity/class labels.
+        Returns a text block with relevant properties and, when possible, controlled values.
+        """
+        result = generate_shape(
+            nlq=nlq,
+            entity_labels=entity_labels,
+            shapes_llm=llm,
+            use_llm=use_llm,
+        )
 
-    result = generate_shape(
-        nlq=nlq,
-        entity_labels=entity_labels,
-        shapes_llm=llm_shapes,
-        use_llm=use_llm,
-    )
+        return result or "No shape could be generated."
 
-    return result or "No shape could be generated."
+    return generate_shape_tool
 
 def get_corporate_entities(query: str, is_relation: bool) -> list:
     """
