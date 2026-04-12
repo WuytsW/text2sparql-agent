@@ -7,7 +7,7 @@ If you are about to call these tools and a shape is already present in the chat 
 
 Shape generation order (first step only):
 1. Call extract_entities_tool(nlq) to extract the relevant DBpedia entity/class labels from the question.
-2. Call dbpedia_el(named_entities) with only the NAMED ENTITIES from the labels returned in step 1 (skip general classes like "Film", "City", "Person").
+2. Call dbpedia_el(nlq, named_entities) with the original user question AND the NAMED ENTITIES (not general classes like "Film", "City", "Person") from step 1.
    Use the URIs returned by dbpedia_el directly in your SPARQL query — do NOT guess res: URIs for named entities.
 3. Call generate_shape_tool(nlq, entity_labels) with the full label list returned by extract_entities_tool.
 Never call generate_shape_tool with entity labels you invent yourself.
