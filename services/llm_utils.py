@@ -9,6 +9,7 @@ from typing import List
 
 from pydantic import BaseModel, Field
 from langchain.tools import tool
+from SPARQLWrapper import SPARQLWrapper, JSON as SPARQL_JSON
 from services.log_utils.log import log_message
 
 from services.shape_generation import generate_shape
@@ -126,6 +127,50 @@ def make_extract_entities_tool(llm):
         return extract_entities(nlq, llm)
 
     return extract_entities_tool
+
+
+class DBpediaCategoriesInput(BaseModel):
+    topic: str = Field(description="A topic or entity label to search for matching DBpedia category URIs (e.g. 'James Bond films', 'Countries in Africa')")
+
+
+@tool("dbpedia_categories_tool", args_schema=DBpediaCategoriesInput)
+def dbpedia_categories_tool(topic: str) -> list:
+    """
+    Searches DBpedia for Wikipedia category URIs (dbc:) that match a given topic.
+    Use this when a question is about group membership and structured ontology triples are insufficient.
+    Returns a list of matching category URIs that can be used as: ?uri dct:subject <category_uri>
+    """
+    dbpedia_url = os.getenv("DBPEDIA_SPARQL_URL", "https://dbpedia.org/sparql")
+    search_term = topic.lower().replace(" ", "_")
+    query = f"""
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX dbc: <http://dbpedia.org/resource/Category:>
+
+SELECT DISTINCT ?cat ?label WHERE {{
+  ?cat a skos:Concept ;
+       rdfs:label ?label .
+  FILTER(STRSTARTS(STR(?cat), "http://dbpedia.org/resource/Category:"))
+  FILTER(CONTAINS(LCASE(STR(?cat)), "{search_term}"))
+}} LIMIT 10
+"""
+    try:
+        sparql = SPARQLWrapper(dbpedia_url)
+        sparql.setTimeout(10)
+        sparql.setQuery(query)
+        sparql.setReturnFormat(SPARQL_JSON)
+        result = sparql.query().convert()
+        categories = []
+        for binding in result.get("results", {}).get("bindings", []):
+            cat_uri = binding.get("cat", {}).get("value", "")
+            label = binding.get("label", {}).get("value", "")
+            if cat_uri:
+                categories.append({"uri": cat_uri, "label": label})
+        log_message(step_name="DBpedia categories", color="Cyan", messages=[f"Topic: {topic}", f"Found: {categories}"])
+        return categories
+    except Exception as e:
+        logging.warning(f"[dbpedia_categories_tool] Query failed for '{topic}': {e}")
+        return []
 
 
 def make_generate_shape_tool(llm):
