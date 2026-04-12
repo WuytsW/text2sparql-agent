@@ -67,7 +67,11 @@ feedback_step_dict = {
     {feedback}
     --- End triplestore response ---
 
-    If the triplestore response contains results, the query logic is correct — do NOT change any filter values or URIs. Only clean up formatting if needed.
+    If the triplestore response contains results, the query is CORRECT — return it UNCHANGED.
+    - Do NOT substitute concrete values from the results back into the query (e.g. do NOT replace ?uri with a specific resource URI).
+    - Do NOT modify the WHERE clause, variable names, or triple patterns in any way.e 
+    
+    
     If the results are empty or an error occurred, the query is WRONG. You MUST rewrite it.
     Common fixes to try:
     - Replace resource URIs used as rdf:type with dbo: ontology classes
@@ -121,20 +125,19 @@ Examples:
 "Animal" → CLASS"""
 }
 
-entities_extraction_prompt = {
+entities_extraction_prompt_old = {
     "en": """Extract the DBpedia entity and class labels needed to answer the following question with a SPARQL query.
 
 Question: "{nlq}"
 
 Rules:
-- Extract the main subject class or named entity being asked about (e.g. "Animal", "City", "Person").
-- Use singular form and capitalise as a DBpedia class would be (e.g. "Animal" not "animals").
+- Use singular form and capitalise as a DBpedia class would be (e.g. "City" not "cities").
 - Descriptive adjectives like "extinct", "largest", "female" are filters, NOT entities — do not extract them.
 - Include a specific named entity only if the question refers to one (e.g. "Uzi", "Skype").
+- If the question contains names where both name and surname are mentioned, extract the full name (e.g. "Michael Jackson" NOT "Michael" or "Jackson").
+- If a named entity is referred to by only a partial name (surname, nickname, or single historical name), expand it (return only full names) to the most complete, commonly recognized full name (e.g. "Napoleon" → "Napoleon Bonaparte").
+- Only extract a class label if it appears as an explicit noun category in the question (e.g. "movies", "museums", "state"). Never extract "Person" — it is too generic to be useful. Use specific subclasses only if the question explicitly names them (e.g. "Actor", "Politician", "Writer").
 - Return ONLY a comma-separated list of labels, no explanations.
-
-Example: "Give me all extinct animals."
-Result: "Animal"
 
 Example: "Who developed Skype?"
 Result: "Skype"
@@ -145,7 +148,32 @@ Result: "Uzi, Weapon"
 Example: "Which state of the USA has the highest population density?"
 Result: "U.S. state"
 
-Example: "Show me all female politicians from Germany."
-Result: "Politician, Germany"
+Example: "Which people were born in Heraklion?"
+Result: "Heraklion"
+
+Example: "Show me all museums in London."
+Result: "Museum, London"
+
+Example: "Where did Abraham Lincoln die?"
+Result: "Abraham Lincoln" NOT "Person"
+"""
+}
+
+entities_extraction_prompt = {
+"en": """    
+Extract the most relevant named entities from the following question:
+    
+Question: "{nlq}"
+    
+Return a comma-separated list of entity names without explanations. Think rationally and in context of the question but respond only with entities literally named in the question. Extracted entities should be in singular form.
+
+exmaple1: "Who developed Skype?"
+result1: "Skype"
+
+exmaple1: "Which other weapons did the designer of the Uzi develop?"
+result1: "Uzi, weapon"
+
+exmaple1: "Which state of the USA has the highest population density?"
+result1: "U.S. state, area, population"
 """
 }
