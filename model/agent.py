@@ -11,3 +11,4 @@ class PlanExecute(TypedDict):
     response: str
     feedback_task: str
     gave_feedback: bool
+    feedback_has_results: bool

@@ -229,18 +229,23 @@ class LLMAgentDBpedia:
 
     def _feedback_step(self, state: PlanExecute):
         task = feedback_step_dict[self.lang]
+        feedback_has_results = False
         try:
             feedback = execute(query=state['chat_history'][-1].content, endpoint_url=self.sparql_endpoint)
             if type(feedback) == dict and "error" not in feedback.keys():
-                feedback = json.dumps(feedback['results']['bindings'][:3])
+                bindings = feedback['results']['bindings'][:3]
+                if bindings:
+                    feedback_has_results = True
+                feedback = json.dumps(bindings)
         except Exception as e:
             feedback = str(e)
-        
+
         log_message(step_name="Feedback", color="Magenta", messages=[feedback])
 
         return {
             "feedback_task": str(task.format(question=state["input"], query=state['chat_history'][-1].content, feedback=feedback, last_task=last_task[self.lang])),
-            "gave_feedback": True
+            "gave_feedback": True,
+            "feedback_has_results": feedback_has_results,
         }
     
     def _eat_step(self, state: PlanExecute):
@@ -282,11 +287,20 @@ class LLMAgentDBpedia:
                 END: END
             }
         )
-        workflow.add_edge("feedback", "agent")
+        workflow.add_conditional_edges(
+            "feedback",
+            self._after_feedback_router,
+            {"agent": "agent", END: END}
+        )
 
         self.app = workflow.compile()
 
         return True
+
+    def _after_feedback_router(self, state: PlanExecute):
+        if state.get("feedback_has_results", False):
+            return END
+        return "agent"
 
     def _feedback_router(self, state: PlanExecute):
         if len(state["plan"]) > 0:
