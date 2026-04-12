@@ -41,6 +41,10 @@ class Plan(BaseModel):
 class NELInput(BaseModel):
     ne_list: list = Field(description="should be a list of named entities (strings) to be linked to the Wikidata URIs")
 
+class DBpediaELInput(BaseModel):
+    nlq: str = Field(description="The user's natural language question to link entities from")
+    ne_list: list = Field(description="List of named entity strings extracted from the question")
+
 class RELInput(BaseModel):
     rel_list: list = Field(description="should be a list of relations (strings) to be linked to the Knowledge Graph  URIs")
 
@@ -91,19 +95,21 @@ def wikidata_el(ne_list: list) -> list:
     log_message(step_name="Entity linking candidates from Wikidata", color="Yellow", messages=[str(nel_list)])
     return nel_list
 
-@tool("dbpedia_el", args_schema=NELInput)
-def dbpedia_el(ne_list: list) -> list:
-    """Performs entity linking to DBpedia based on the provided list of named entity strings. Returns list of dict with linking candidates: [{"label": "URI"}]"""
+@tool("dbpedia_el", args_schema=DBpediaELInput)
+def dbpedia_el(nlq: str, ne_list: list) -> list:
+    """Performs entity linking to DBpedia using both the full question and individual named entities. Returns list of dict with linking candidates: [{"label": "URI"}]"""
+    seen = set()
     nel_list = []
-    N = 5
-    for ne in ne_list[:N]:
-        falcon_result = falcon_external(text=ne)
-        entities = falcon_result.get("entities_dbpedia", [])
-        relations = falcon_result.get("relations_dbpedia", [])
-        nel_list += entities
-        nel_list += relations
 
-    log_message(step_name="Entity linking candidates from DBpedia", color="Yellow", messages=[str(nel_list)])    
+    for text in [nlq] + ne_list:
+        falcon_result = falcon_external(text=text)
+        for item in falcon_result.get("entities_dbpedia", []) + falcon_result.get("relations_dbpedia", []):
+            uri = list(item.values())[0] if item else None
+            if uri and uri not in seen:
+                seen.add(uri)
+                nel_list.append(item)
+
+    log_message(step_name="Entity linking candidates from DBpedia", color="Yellow", messages=[str(nel_list)])
     return nel_list
 
 def make_extract_entities_tool(llm):
