@@ -130,6 +130,42 @@ SELECT DISTINCT ?prop ?domain ?range WHERE {{
     return properties
 
 
+def get_abox_dbp_properties(class_uri: str, sparql_endpoint: str, sample_size: int = 3) -> list:
+    """
+    Returns dbp: (raw Wikipedia infobox) properties found on sample instances of a class.
+    These are NOT in the T-Box but frequently hold the actual data values in DBpedia.
+    Each result is a dict with 'prop' (full URI) and 'range' (empty string, unknown from A-box).
+    """
+    dbp_ns = "http://dbpedia.org/property/"
+    query = f"""
+SELECT DISTINCT ?prop WHERE {{
+  ?instance a <{class_uri}> .
+  ?instance ?prop ?val .
+  FILTER(STRSTARTS(STR(?prop), "{dbp_ns}"))
+}} LIMIT 60
+"""
+    try:
+        sparql = SPARQLWrapper(sparql_endpoint)
+        sparql.timeout = 20
+        sparql.setQuery(query)
+        sparql.setReturnFormat(JSON)
+        result = sparql.query().convert()
+    except Exception as e:
+        logging.warning(f"[get_abox_dbp_properties] A-Box dbp: query failed for <{class_uri}>: {e}")
+        return []
+
+    properties = []
+    seen = set()
+    for binding in result.get("results", {}).get("bindings", []):
+        prop = binding.get("prop", {}).get("value", "")
+        if prop and prop not in seen:
+            seen.add(prop)
+            properties.append({"prop": prop, "domain": "", "range": ""})
+
+    logging.info(f"[get_abox_dbp_properties] Found {len(properties)} dbp: properties for <{class_uri}>")
+    return properties
+
+
 def _query_property_values(prop_prefixed: str, sparql_endpoint: str) -> list:
     """
     Returns distinct values for prop_prefixed if the property has at most
@@ -309,6 +345,17 @@ def generate_shape(nlq: str, entity_labels: list, shapes_llm, use_llm: bool = Fa
                 class_uri = f"http://dbpedia.org/ontology/{label_clean}"
                 props = get_tbox_properties(class_uri, endpoint)
                 items = _tbox_to_prop_range_items(props)
+                # Also fetch raw Wikipedia infobox (dbp:) properties from A-box sample instances.
+                # These are absent from the T-Box but often hold the actual data values.
+                dbp_props = get_abox_dbp_properties(class_uri, endpoint)
+                dbp_items = _tbox_to_prop_range_items(dbp_props)
+                # Merge, avoiding duplicates (dbo: items take precedence).
+                existing_props = {item.split(" ->")[0].strip() for item in items}
+                for dbp_item in dbp_items:
+                    dbp_key = dbp_item.split(" ->")[0].strip()
+                    if dbp_key not in existing_props:
+                        items.append(dbp_item)
+                        existing_props.add(dbp_key)
             else:
                 logging.info(f"[generate_shape] '{label_clean}' -> ENTITY (shexer path)")
                 shex_str = _run_shexer_for_entity(label_clean, endpoint, _NAMESPACES_DICT)

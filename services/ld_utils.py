@@ -19,6 +19,9 @@ prefixes_list = [
     {"dbp": "PREFIX dbp: <http://dbpedia.org/property/>"},
     {"dbo": "PREFIX dbo: <http://dbpedia.org/ontology/>"},
     {"dbr": "PREFIX dbr: <http://dbpedia.org/resource/>"},
+    {"res": "PREFIX res: <http://dbpedia.org/resource/>"},
+    {"dct": "PREFIX dct: <http://purl.org/dc/terms/>"},
+    {"dbc": "PREFIX dbc: <http://dbpedia.org/resource/Category:>"},
 ]
 
 

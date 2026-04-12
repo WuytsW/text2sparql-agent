@@ -17,7 +17,7 @@ import os
 import json
 import logging
 
-from services.llm_utils import dbpedia_el, Plan, get_expected_answer_type, make_extract_entities_tool, make_generate_shape_tool
+from services.llm_utils import dbpedia_el, dbpedia_categories_tool, Plan, get_expected_answer_type, make_extract_entities_tool, make_generate_shape_tool
 from services.ld_utils import execute, post_process
 from model.agent import PlanExecute
 from prompts.dbpedia import (
@@ -134,6 +134,7 @@ class LLMAgentDBpedia:
         self.tools = [
             make_extract_entities_tool(self.entities_llm),
             make_generate_shape_tool(self.shapes_llm),
+            dbpedia_categories_tool,
         ] + self._base_tools
 
         self.agent_runnable_execution_original = create_tool_calling_agent(self.llm_execution_original, self.tools, self.agent_prompt)
