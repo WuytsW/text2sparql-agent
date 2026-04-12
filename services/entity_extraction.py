@@ -1,4 +1,3 @@
-import re
 import os
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -28,15 +27,9 @@ def extract_entities(question, llm):
 
     raw_response = response.content.strip()
 
-    entities = re.findall(r'"([^"]+)"', raw_response)
-
-    if entities:
-        flat = []
-        for e in entities:
-            flat.extend([part.strip() for part in e.split(",") if part.strip()])
-        entities = flat
-    else:
-        entities = [e.strip() for e in raw_response.split(",") if e.strip()]
+    # Strip any outer quotes wrapping the entire response, then split on commas
+    cleaned = raw_response.strip('"').strip("'")
+    entities = [e.strip().strip('"').strip("'") for e in cleaned.split(",") if e.strip()]
 
     entities = [e for e in entities if len(e) > 0 and not e.isspace()]
 
