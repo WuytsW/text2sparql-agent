@@ -50,12 +50,13 @@ async def get_answer(
        # result = corporate_agent.generate_sparql(question, model_name=model_name, compact=compact)
     else:
         raise HTTPException(status_code=404, detail="Unknown dataset. Please use one of the known datasets.")
-
+          
     return {
         "dataset": dataset,
         "question": question,
         "model_name": model_name,
         "compact": compact,
+        "translated_question": result["translated_question"],
         "query": result["query"],
         "prompt_tokens": result["prompt_tokens"],
         "completion_tokens": result["completion_tokens"],

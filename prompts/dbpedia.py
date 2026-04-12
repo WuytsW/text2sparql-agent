@@ -160,20 +160,35 @@ Result: "Abraham Lincoln" NOT "Person"
 }
 
 entities_extraction_prompt = {
-"en": """    
-Extract the most relevant named entities from the following question:
-    
+"en": """Extract the DBpedia entity and class labels needed to answer the following question with a SPARQL query.
+
 Question: "{nlq}"
-    
-Return a comma-separated list of entity names without explanations. Think rationally and in context of the question but respond only with entities literally named in the question. Extracted entities should be in singular form.
 
-exmaple1: "Who developed Skype?"
-result1: "Skype"
+Rules:
+- Return ONLY a comma-separated list of labels, no explanations.
+- Use singular form and capitalise as a DBpedia class would be (e.g. "Novelist" not "novelists").
+- Descriptive adjectives like "largest", "extinct", "female" are filters, NOT entities — do not include them.
+- Titles of creative works (books, films, games, albums, TV series, etc.) are single named entities regardless of how many words they contain. Treat the full title as one item (e.g. "The Pillars of the Earth", NOT "pillar", "earth").
+- Full person names must be kept together (e.g. "Abraham Lincoln" NOT "Abraham" or "Lincoln").
+- If a named entity is referred to only by a partial name, expand it to the most complete, commonly recognized form (e.g. "Napoleon" → "Napoleon Bonaparte").
+- Only include a class label if it appears as an explicit noun category in the question (e.g. "novelist", "weapon", "state"). Never extract "Person" — it is too generic.
 
-exmaple1: "Which other weapons did the designer of the Uzi develop?"
-result1: "Uzi, weapon"
+Example: "Who developed Skype?"
+Result: Skype
 
-exmaple1: "Which state of the USA has the highest population density?"
-result1: "U.S. state, area, population"
+Example: "Which other weapons did the designer of the Uzi develop?"
+Result: Uzi, Weapon
+
+Example: "Which state of the USA has the highest population density?"
+Result: U.S. state
+
+Example: "Who wrote the book The Pillars of the Earth?"
+Result: The Pillars of the Earth
+
+Example: "Where did Abraham Lincoln die?"
+Result: Abraham Lincoln
+
+Example: "Show me all museums in London."
+Result: Museum, London
 """
 }

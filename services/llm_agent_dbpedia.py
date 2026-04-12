@@ -23,7 +23,6 @@ from model.agent import PlanExecute
 from prompts.dbpedia import (
     system_prompt,
     last_task,
-    planner_prompt_dct,
     feedback_step_dict
 )
 
@@ -148,14 +147,11 @@ class LLMAgentDBpedia:
 
         self.current_model = model_name
 
-    def _plan_step(self, state: PlanExecute):
-        try:
-            plan = self.plan_llm.invoke(planner_prompt_dct[self.lang].format(objective=state["input"]))
-            log_message(step_name="Planning", color="Magenta", messages=[plan.steps])
-            return {"plan": plan.steps + [last_task]}
-        except Exception as e:
-            plan = [last_task]
-            return {"plan": plan}
+    def _plan_step(self, _state: PlanExecute):
+        step1 = "Generate the shape: call extract_entities_tool, dbpedia_el, and generate_shape_tool."
+        step2 = "Construct the SPARQL query using the shape and URIs from step 1."
+        log_message(step_name="Planning", color="Magenta", messages=[[step1, step2]])
+        return {"plan": [step1, step2, last_task]}
         
     def _append_tool_trace(self, state: PlanExecute, task: str, agent_response: dict):
         """Append the full tool call trace from an AgentExecutor response to chat_history.
@@ -358,6 +354,7 @@ class LLMAgentDBpedia:
             self.log_handler._flush_to_file(generated_query)
 
             return {
+                "translated_question": translated_question,
                 "query": generated_query,
                 "prompt_tokens": cb.prompt_tokens,
                 "completion_tokens": cb.completion_tokens,
