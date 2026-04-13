@@ -10,7 +10,6 @@ from prompts.dbpedia import (
     class_instances_prompt,
 )
 from SPARQLWrapper import SPARQLWrapper, JSON
-from services.log_utils.log import log_message
 
 load_dotenv(dotenv_path=".env")
 
@@ -126,7 +125,7 @@ SELECT DISTINCT ?prop ?domain ?range WHERE {{
         if prop:
             properties.append({"prop": prop, "domain": domain, "range": range_})
 
-    logging.info(f"[get_tbox_properties] Found {len(properties)} properties for <{class_uri}>")
+    #logging.info(f"[get_tbox_properties] Found {len(properties)} properties for <{class_uri}>")
     return properties
 
 
@@ -151,7 +150,7 @@ SELECT DISTINCT ?prop WHERE {{
         sparql.setReturnFormat(JSON)
         result = sparql.query().convert()
     except Exception as e:
-        logging.warning(f"[get_abox_dbp_properties] A-Box dbp: query failed for <{class_uri}>: {e}")
+        #logging.warning(f"[get_abox_dbp_properties] A-Box dbp: query failed for <{class_uri}>: {e}")
         return []
 
     properties = []
@@ -162,7 +161,7 @@ SELECT DISTINCT ?prop WHERE {{
             seen.add(prop)
             properties.append({"prop": prop, "domain": "", "range": ""})
 
-    logging.info(f"[get_abox_dbp_properties] Found {len(properties)} dbp: properties for <{class_uri}>")
+    #logging.info(f"[get_abox_dbp_properties] Found {len(properties)} dbp: properties for <{class_uri}>")
     return properties
 
 
@@ -183,7 +182,7 @@ def _query_property_values(prop_prefixed: str, sparql_endpoint: str) -> list:
         sparql.setReturnFormat(JSON)
         result = sparql.query().convert()
     except Exception as e:
-        logging.warning(f"[_query_property_values] Failed for {prop_prefixed}: {e}")
+        #logging.warning(f"[_query_property_values] Failed for {prop_prefixed}: {e}")
         return []
     bindings = result.get("results", {}).get("bindings", [])
     if len(bindings) > _MAX_ENUM_VALUES:
@@ -275,7 +274,7 @@ def _run_shexer_for_entity(label_clean: str, endpoint: str, namespaces_dict: dic
         )
         return shaper.shex_graph(string_output=True) or ""
     except Exception as e:
-        logging.warning(f"[_run_shexer_for_entity] shexer failed for {label_clean}: {e}")
+        #logging.warning(f"[_run_shexer_for_entity] shexer failed for {label_clean}: {e}")
         return ""
 
 
@@ -285,7 +284,6 @@ def _process_entity_section(
     nlq: str,
     llm,
     endpoint: str,
-    use_llm: bool,
 ) -> str:
     """
     Runs the filter -> values pipeline for one entity and returns a labeled
@@ -293,7 +291,7 @@ def _process_entity_section(
     """
     if not items:
         return ""
-    if llm and (use_llm or len(items) > _MAX_PROPS_WITHOUT_FILTER):
+    if llm and len(items) > _MAX_PROPS_WITHOUT_FILTER:
         items = select_relevant_shape_parts(nlq, "\n".join(items), llm, label=label_clean)
     if not items:
         return ""
@@ -328,20 +326,20 @@ _NAMESPACES_DICT = {
 }
 
 
-def generate_shape(nlq: str, entity_labels: list, shapes_llm, use_llm: bool = False):
+def generate_shape(nlq: str, entity_labels: list, shapes_llm):
     load_dotenv(dotenv_path=".env")
     endpoint = os.getenv("DBPEDIA_SPARQL_URL")
-    logging.info(f"[generate_shape] Entity labels: {entity_labels}")
+    #logging.info(f"[generate_shape] Entity labels: {entity_labels}")
 
     sections = []
     try:
         for label in entity_labels:
             label_clean = label.replace(" ", "_")
             label_clean = label_clean[0].upper() + label_clean[1:]
-            logging.info(f"[generate_shape] Processing '{label_clean}'")
+            #logging.info(f"[generate_shape] Processing '{label_clean}'")
 
             if _llm_classify(label_clean, shapes_llm):
-                logging.info(f"[generate_shape] '{label_clean}' -> CLASS (T-Box path)")
+                #logging.info(f"[generate_shape] '{label_clean}' -> CLASS (T-Box path)")
                 class_uri = f"http://dbpedia.org/ontology/{label_clean}"
                 props = get_tbox_properties(class_uri, endpoint)
                 items = _tbox_to_prop_range_items(props)
@@ -357,26 +355,24 @@ def generate_shape(nlq: str, entity_labels: list, shapes_llm, use_llm: bool = Fa
                         items.append(dbp_item)
                         existing_props.add(dbp_key)
             else:
-                logging.info(f"[generate_shape] '{label_clean}' -> ENTITY (shexer path)")
+                #logging.info(f"[generate_shape] '{label_clean}' -> ENTITY (shexer path)")
                 shex_str = _run_shexer_for_entity(label_clean, endpoint, _NAMESPACES_DICT)
                 items = _parse_shex_to_prop_range_items(shex_str)
 
             section = _process_entity_section(
-                label_clean, items, nlq, shapes_llm, endpoint, use_llm
+                label_clean, items, nlq, shapes_llm, endpoint
             )
             if section:
                 sections.append(section)
 
     except Exception as e:
-        logging.error(f"[generate_shape] Failed: {e}", exc_info=True)
+        #logging.error(f"[generate_shape] Failed: {e}", exc_info=True)
         return None
 
     if not sections:
-        logging.warning(f"[generate_shape] No sections produced for labels: {entity_labels}")
+        #logging.warning(f"[generate_shape] No sections produced for labels: {entity_labels}")
         return None
 
     result = "\n\n".join(sections)
-
-    log_message("generate_shape", "Cyan", [f"NLQ: {nlq}", f"Entity labels: {entity_labels}", f"Generated shape:\n{result}"])
 
     return result

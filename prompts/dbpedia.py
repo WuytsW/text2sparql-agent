@@ -24,6 +24,12 @@ Only output VALID JSON without escape chars: {{"plan": ["step1", "step2", ...]}}
 Make sure that the output is VALID JSON"""
 }
 
+execute_step_prompt = {
+    "en": """User question: {nlq}
+Task: Construct the SPARQL query using the pre-computed entity URIs and DBpedia shape provided in the context
+    """
+}
+
 
 last_task = {
     "en": """Make sure that the query is formatted correctly. No extra text. No markdown. Just plain SPARQL query.
