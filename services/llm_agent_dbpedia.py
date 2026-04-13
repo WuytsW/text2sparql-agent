@@ -17,7 +17,9 @@ import os
 import json
 import logging
 
-from services.llm_utils import dbpedia_el, dbpedia_categories_tool, Plan, get_expected_answer_type, make_extract_entities_tool, make_generate_shape_tool
+from services.llm_utils import dbpedia_el, dbpedia_categories_tool, Plan, get_expected_answer_type
+from services.entity_extraction import extract_entities
+from services.shape_generation import generate_shape
 from services.ld_utils import execute, post_process
 from model.agent import PlanExecute
 from prompts.dbpedia import (
@@ -38,7 +40,7 @@ class LLMAgentDBpedia:
             model_name: str = "openai/gpt-4o-mini",
             embedding_model_name: str = "intfloat/multilingual-e5-large",
             return_N: int = 5,
-            tools: List = [dbpedia_el],
+            tools: List = [],
             lang: str = "en"
         ):
 
@@ -90,7 +92,7 @@ class LLMAgentDBpedia:
             model=model_name,
             temperature=0,
             api_key=os.getenv("mKGQAgent_Run_no_changes"),
-            base_url="https://openrouter.ai/api/v1",
+            base_url="https://openrouter.ai/api/v1"
         ).with_structured_output(Plan)
 
         self.llm_eat = ChatOpenAI(
@@ -122,20 +124,16 @@ class LLMAgentDBpedia:
         self.shapes_llm = ChatOpenAI(
             model=model_name,
             api_key=os.getenv("mKGQAgent_Shapes_LLM"),
-            base_url="https://openrouter.ai/api/v1",
+            base_url="https://openrouter.ai/api/v1"
         )
 
         self.translation_llm = ChatOpenAI(
             model=model_name,
             api_key=os.getenv("mKGQAgent_Translation_LLM"),
-            base_url="https://openrouter.ai/api/v1",
+            base_url="https://openrouter.ai/api/v1"
         )
 
-        self.tools = [
-            make_extract_entities_tool(self.entities_llm),
-            make_generate_shape_tool(self.shapes_llm),
-            dbpedia_categories_tool,
-        ] + self._base_tools
+        self.tools = [dbpedia_categories_tool] + self._base_tools
 
         self.agent_runnable_execution_original = create_tool_calling_agent(self.llm_execution_original, self.tools, self.agent_prompt)
         self.agent_runnable_execution_compact = create_tool_calling_agent(self.llm_execution_compact, self.tools, self.agent_prompt)
@@ -149,10 +147,55 @@ class LLMAgentDBpedia:
         self.current_model = model_name
 
     def _plan_step(self, _state: PlanExecute):
-        step1 = "Generate the shape: call extract_entities_tool, dbpedia_el, and generate_shape_tool."
-        step2 = "Construct the SPARQL query using the shape and URIs from step 1."
-        log_message(step_name="Planning", color="Magenta", messages=[[step1, step2]])
-        return {"plan": [step1, step2, last_task]}
+        step = "Construct the SPARQL query using the pre-computed entity URIs and DBpedia shape provided in the context."
+        log_message(step_name="Planning", color="Magenta", messages=[[step]])
+        return {"plan": [step, last_task]}
+
+    def _entity_linking_step(self, state: PlanExecute):
+        """Pre-compute entity extraction, DBpedia entity linking, and shape generation.
+
+        Results are appended to chat_history as a single HumanMessage so the
+        executor receives ready-made context and never needs to call these tools itself.
+        """
+        # 1. Extract entity labels
+        try:
+            entity_labels = extract_entities(state['input'], self.entities_llm)
+        except Exception as e:
+            entity_labels = []
+            log_message(step_name="Entity extraction failed", color="Red", messages=[str(e)])
+        log_message(step_name="Extracted entities", color="Cyan", messages=[str(entity_labels)])
+
+        # 2. Link entities via DBpedia EL (Falcon API — free, no LLM)
+        try:
+            linked = dbpedia_el.invoke({"nlq": state['input'], "ne_list": entity_labels})
+        except Exception as e:
+            linked = []
+            log_message(step_name="Entity linking failed", color="Red", messages=[str(e)])
+
+        # 3. Generate shape
+        try:
+            shape = generate_shape(
+                nlq=state['input'],
+                entity_labels=entity_labels,
+                shapes_llm=self.shapes_llm,
+                use_llm=False,
+            )
+        except Exception as e:
+            shape = ""
+            log_message(step_name="Shape generation failed", color="Red", messages=[str(e)])
+
+        # Build context message
+        context_parts = []
+        if linked:
+            context_parts.append(f"Entity URIs from DBpedia: {json.dumps(linked)}")
+        if shape:
+            context_parts.append(f"DBpedia shape:\n{shape}")
+        if context_parts:
+            context_msg = "\n\n".join(context_parts)
+            state['chat_history'].append(HumanMessage(content=context_msg))
+            log_message(step_name="Entity linking context added", color="Cyan", messages=[context_msg])
+
+        return {"gave_feedback": state["gave_feedback"]}
         
     def _append_tool_trace(self, state: PlanExecute, task: str, agent_response: dict):
         """Append the full tool call trace from an AgentExecutor response to chat_history.
@@ -184,6 +227,9 @@ class LLMAgentDBpedia:
             all_steps = list(state["plan"])
             state["plan"].clear()
             task = "Complete all of the following steps in order:\n" + "\n".join(f"{i+1}. {s}" for i, s in enumerate(all_steps))
+            icl = getattr(self, '_current_icl', '')
+            if icl:
+                task += f"\n\n{icl}"
 
         log_message(step_name="Execute (Compact) task", color="Magenta", messages=[task])
 
@@ -271,13 +317,15 @@ class LLMAgentDBpedia:
 
         workflow.add_node("planner", self._plan_step)
         workflow.add_node("eat", self._eat_step)
+        workflow.add_node("entity_linking", self._entity_linking_step)
         workflow.add_node("agent", execute_fn)
         workflow.add_node("feedback", self._feedback_step)
 
         # Define the edges between the nodes
         workflow.set_entry_point("planner")
         workflow.add_edge("planner", "eat")
-        workflow.add_edge("eat", "agent")
+        workflow.add_edge("eat", "entity_linking")
+        workflow.add_edge("entity_linking", "agent")
         workflow.add_conditional_edges(
             "agent",
             # Next, we pass in the function that will determine which node is called next.
@@ -352,12 +400,14 @@ class LLMAgentDBpedia:
             translated_question = translate_question(input_question, self.translation_llm)
             log_message(step_name="Translated question", color="Yellow", messages=[translated_question])
 
+            self._current_icl = self.get_similar_examples(translated_question)
+
             self.log_handler.reset(translated_question, enabled=log_calls)
             with get_openai_callback() as cb:
                 agent_result = self.app.invoke(
-                    {"input": translated_question, "chat_history": [SystemMessage(content=f"""{system_prompt[self.lang]}
-                    {self.get_similar_examples(translated_question)}""")],
-                    "gave_feedback": False},
+                    {"input": translated_question,
+                     "chat_history": [SystemMessage(content=system_prompt[self.lang])],
+                     "gave_feedback": False},
                     config={"callbacks": [self.log_handler]}
                 )
 
@@ -393,7 +443,7 @@ if __name__ == "__main__":
         model_name="openai/gpt-4o-mini",
         embedding_model_name="intfloat/multilingual-e5-large",
         return_N=5,
-        tools=[dbpedia_el],
+        tools=[],
         lang="en"
     )
 
