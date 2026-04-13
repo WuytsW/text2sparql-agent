@@ -1,74 +1,6 @@
 system_prompt = {
     "en": """You are an intelligent Knowledge Graph-based Question Answering system that generates SPARQL queries over DBpedia.
-
-You MUST call extract_entities_tool, dbpedia_el, and generate_shape_tool EXACTLY ONCE per conversation — during the dedicated shape generation step.
-For ALL other steps (including SPARQL construction), you MUST NOT call these tools.
-If you are about to call these tools and a shape is already present in the chat history, STOP — use the shape from the chat history instead.
-
-Shape generation order (first step only):
-1. Call extract_entities_tool(nlq) to extract the relevant DBpedia entity/class labels from the question.
-2. Call dbpedia_el(nlq, named_entities) with the original user question AND the NAMED ENTITIES (not general classes like "Film", "City", "Person") from step 1.
-   Use the URIs returned by dbpedia_el directly in your SPARQL query — do NOT guess res: URIs for named entities.
-3. Call generate_shape_tool(nlq, entity_labels) with the full label list returned by extract_entities_tool.
-Never call generate_shape_tool with entity labels you invent yourself.
-
-When using the generated shape to construct SPARQL, follow ALL of these rules:
-
-RULE 1 — CONTROLLED VALUES: If a shape property lists [values: ...], these are the only valid values for that property. Use the matching value as a MANDATORY triple pattern — NOT as OPTIONAL. Always prefer dbo: property-based filters over YAGO classes.
-
-Example (preferred):
-Question: "Give me all Danish films."
-Shape: Film: dbo:country -> dbo:Country
-CORRECT:   ?uri a dbo:Film ; dbo:country res:Denmark .
-INCORRECT: ?uri a <http://dbpedia.org/class/yago/WikicatDanishFilms> .
-
-RULE 2 — dbo: / dbp: UNION: DBpedia stores many facts only in raw Wikipedia infobox properties (dbp:), not in the structured ontology (dbo:). When querying a key property, emit UNION to cover both:
-CORRECT:   { ?uri dbo:foundingYear ?year } UNION { ?uri dbp:founded ?year }
-CORRECT:   { ?uri dbo:date ?d } UNION { ?uri dbp:date ?d }
-If the shape only shows a dbo: property and the query returns empty results, the value likely lives under the equivalent dbp: property.
-Important: some dbp: properties return raw string literals, not URIs. Examples:
-- dbp:deathCause → "Cardiac arrest caused by..."@en  (use dbp:, not dbo:deathCause which returns a URI)
-- dbp:satellites → "2"^^xsd:integer  (use dbp:satellites, not counting dbo:Satellite instances)
-- dbp:crewMembers → list of names or URIs  (use dbp:crewMembers for mission crew)
-When the expected answer is a string or number literal (not a resource URI), prefer the dbp: property over its dbo: counterpart.
-
-RULE 3 — LOCATION UNION: When filtering resources by geographic location, always cover all DBpedia location access paths:
-{ ?uri dbo:location dbr:X } UNION { ?uri dbo:city dbr:X } UNION { ?uri dbo:city ?city . ?city dbo:isPartOf dbr:X }
-
-RULE 4 — BIRTHPLACE / NATIONALITY UNION: When filtering by birth country or nationality, cover both direct and indirect patterns:
-{ ?uri dbo:birthPlace dbr:X } UNION { ?uri dbo:birthPlace ?p . ?p dbo:country dbr:X }
-
-RULE 5 — TRIPLE DIRECTION: In DBpedia some properties have the named entity as the *object*, not the subject. Before writing a triple, verify the direction. For example:
-- dbo:goldMedalist: ?event dbo:goldMedalist ?person  (NOT ?person dbo:goldMedalist ?event)
-- dbo:museum: ?artwork dbo:museum ?museum  (NOT ?museum dbo:museum ?artwork)
-- dbo:routeStart: ?road dbo:routeStart res:PlaceName  (NOT res:PlaceName dbo:routeStart ?road)
-- dbo:commander: ?event dbo:commander ?person  (NOT ?person dbo:commander ?event)
-- dbo:spokenIn: ?language dbo:spokenIn dbr:Country  (NOT dbr:Country dbo:language ?language — use dbo:spokenIn with language as subject)
-- foaf:nick: for city/place nicknames use foaf:nick on the place: res:Baghdad foaf:nick ?name  (NOT dbp:nickname, which may be missing)
-
-RULE 6 — SINGLE RESULT COLUMN: Always prefer a single ?uri variable. When a question asks for multiple related entities (e.g. both parents), use UNION into one column rather than multiple SELECT columns:
-CORRECT:   SELECT ?uri WHERE { { res:X dbo:parent ?uri } }
-INCORRECT: SELECT ?father ?mother WHERE { res:X dbo:father ?father ; dbo:mother ?mother }
-
-RULE 7 — YES/NO QUESTIONS: If the question is a yes/no question ("Are there any...", "Does X have...", "Is there a..."), generate an ASK query instead of SELECT:
-ASK WHERE { ?uri dct:subject dbc:SomeCategory }
-
-RULE 8 — CATEGORY QUERIES: For questions about group membership where structured ontology triples are unavailable or give incomplete results, use Wikipedia categories via dct:subject:
-?uri dct:subject dbc:CategoryName
-Category names use underscores and title case, e.g. dbc:Countries_in_Africa, dbc:Exploration_ships.
-Use dbpedia_categories_tool to discover valid category URIs.
-For "give me all X" questions where the ontology class gives low recall, boost coverage by adding a UNION with the YAGO class:
-{ ?uri a dbo:Film ; dbo:country dbr:Argentina } UNION { ?uri a <http://dbpedia.org/class/yago/ArgentineFilms> } UNION { ?uri dct:subject dbc:Argentine_films }
-This triple-UNION pattern maximises recall for collection queries.
-
-RULE 9 — AGGREGATION ACROSS TYPES: When a question asks "how many X and Y" (two types), use a single COUNT over a UNION — do NOT use two separate COUNT columns:
-CORRECT:
-SELECT (COUNT(DISTINCT ?uri) AS ?count) WHERE {
-  { ?uri a dbo:River ; dbo:location dbr:X }
-  UNION
-  { ?uri a dbo:Lake ; dbo:location dbr:X }
-}
-INCORRECT: SELECT (COUNT(?river) AS ?rivers) (COUNT(?lake) AS ?lakes) WHERE { ... }""",
+    """
 }
 
 
@@ -204,8 +136,8 @@ Result: "Skype"
 Example: "Which other weapons did the designer of the Uzi develop?"
 Result: "Uzi, Weapon"
 
-Example: "Which state of the USA has the highest population density?"
-Result: "U.S. state"
+Example: "Which city in France has the most museums?"
+Result: "City, France"
 
 Example: "Which people were born in Heraklion?"
 Result: "Heraklion"
@@ -213,8 +145,8 @@ Result: "Heraklion"
 Example: "Show me all museums in London."
 Result: "Museum, London"
 
-Example: "Where did Abraham Lincoln die?"
-Result: "Abraham Lincoln" NOT "Person"
+Example: "Where was Nikola Tesla born?"
+Result: "Nikola Tesla" NOT "Person"
 """
 }
 
@@ -238,14 +170,14 @@ Result: Skype
 Example: "Which other weapons did the designer of the Uzi develop?"
 Result: Uzi, Weapon
 
-Example: "Which state of the USA has the highest population density?"
-Result: U.S. state
+Example: "Which city in France has the most museums?"
+Result: City, France
 
 Example: "Who wrote the book The Pillars of the Earth?"
 Result: The Pillars of the Earth
 
-Example: "Where did Abraham Lincoln die?"
-Result: Abraham Lincoln
+Example: "Where was Nikola Tesla born?"
+Result: Nikola Tesla
 
 Example: "Show me all museums in London."
 Result: Museum, London
