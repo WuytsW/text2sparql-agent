@@ -24,7 +24,6 @@ def _translate_with_llm(text: str, llm) -> str:
 
     try:
         user_prompt = (
-            "You are a professional translator. "
             "If the question is already in English, simply return it unchanged. "
             "If it is not in English, translate it into English. "
             "Only output the English sentence without any additional explanation.\n\n"

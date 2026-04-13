@@ -79,4 +79,4 @@ class LogLLMCallbackHandler(BaseCallbackHandler):
         if text:
             if self._log_entries:
                 self._log_entries[-1]["response"] = text
-            logging.info(f"{GREEN}[LLM response #{self.call_count}]:\n{text}{RESET}")
+            logging.info(f"{MAGENTA}[LLM response #{self.call_count}]:\n{text}{RESET}")
