@@ -266,6 +266,7 @@ class LLMAgentDBpedia:
             with get_openai_callback() as cb:
                 translated_question = self._translate_step(input_question)
                 self._eat_step(chat_history, translated_question)
+                self._get_similar_examples_step(chat_history, translated_question)
                 self._context_step(chat_history, translated_question, shape_step)
 
                 self._execute_step(str(execute_step_prompt[self.lang].format(nlq=translated_question)), chat_history)
