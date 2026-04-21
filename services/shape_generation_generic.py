@@ -3,6 +3,7 @@ import re as _re
 import logging
 from dataclasses import dataclass, field
 from typing import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from shexer.shaper import Shaper
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
@@ -16,7 +17,7 @@ from SPARQLWrapper import SPARQLWrapper, JSON
 load_dotenv(dotenv_path=".env")
 
 # ---------------------------------------------------------------------------
-# Module-level constants (non-KG-specific)
+# Module-level constants
 # ---------------------------------------------------------------------------
 
 _MAX_ENUM_VALUES = 30
@@ -205,10 +206,11 @@ SELECT DISTINCT ?prop WHERE {{
         sparql.setReturnFormat(JSON)
         result = sparql.query().convert()
     except Exception as e:
+        logging.warning(f"[get_abox_extra_properties] A-Box query failed for <{class_uri}>: {e}")
         return []
 
-    properties = []
     seen = set()
+    properties = []
     for binding in result.get("results", {}).get("bindings", []):
         prop = binding.get("prop", {}).get("value", "")
         if prop and prop not in seen:
@@ -234,15 +236,18 @@ def _query_property_values(
     query = f"SELECT DISTINCT ?val WHERE {{ ?s <{prop_uri}> ?val . }} LIMIT {_MAX_ENUM_VALUES + 1}"
     try:
         sparql = SPARQLWrapper(sparql_endpoint)
-        sparql.timeout = 15
+        sparql.timeout = 5
         sparql.setQuery(query)
         sparql.setReturnFormat(JSON)
         result = sparql.query().convert()
     except Exception as e:
+        logging.warning(f"[_query_property_values] Value query failed for <{prop_prefixed}>: {e}")
         return []
+
     bindings = result.get("results", {}).get("bindings", [])
     if len(bindings) > _MAX_ENUM_VALUES:
         return []
+
     values = []
     for b in bindings:
         val_data = b.get("val", {})
@@ -260,36 +265,49 @@ def add_possible_values_to_shape(
     relevant_items: list,
     sparql_endpoint: str,
     kg_config: KGConfig,
-) -> str:
+) -> list:
     """
     For each prop -> range item, queries the A-Box for distinct values using
     cardinality filtering. Properties with few distinct values (controlled
     vocabulary) get their values listed; others are left as-is.
+
+    Returns a list of annotated prop -> range strings.
     """
-    result_lines = []
-    for item in relevant_items:
-        item = item.strip()
-        if not item:
-            continue
-        m = _PROP_RANGE_RE.match(item)
-        if not m:
-            result_lines.append(item)
-            continue
-        prop, range_ = m.group(1), m.group(2)
-        values = _query_property_values(prop, sparql_endpoint, kg_config)
-        if values:
-            vals_str = ", ".join(values)
-            result_lines.append(f"{prop} -> {range_} [values: {vals_str}]")
-        else:
-            result_lines.append(f"{prop} -> {range_}")
-    return "\n".join(result_lines)
+    # Separate items that need a value query from pass-through items,
+    # preserving original order via an index map.
+    indexed_results = {}
+    futures_map = {}
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        for idx, item in enumerate(relevant_items):
+            item = item.strip()
+            if not item:
+                indexed_results[idx] = item
+                continue
+            m = _PROP_RANGE_RE.match(item)
+            if not m:
+                indexed_results[idx] = item
+                continue
+            prop, range_ = m.group(1), m.group(2)
+            future = executor.submit(_query_property_values, prop, sparql_endpoint, kg_config)
+            futures_map[future] = (idx, prop, range_)
+
+        for future in as_completed(futures_map):
+            idx, prop, range_ = futures_map[future]
+            values = future.result()
+            if values:
+                indexed_results[idx] = f"{prop} -> {range_} [values: {', '.join(values)}]"
+            else:
+                indexed_results[idx] = f"{prop} -> {range_}"
+
+    return [indexed_results[i] for i in sorted(indexed_results)]
 
 
 # ---------------------------------------------------------------------------
 # LLM helpers
 # ---------------------------------------------------------------------------
 
-def _llm_classify(label, llm):
+def _llm_classify(label, llm) -> bool:
     """Returns True if label is a CLASS/type, False if it is a named ENTITY."""
     prompt = class_instances_prompt["en"].format(label=label)
     response = llm.invoke([HumanMessage(content=prompt)])
@@ -314,8 +332,42 @@ def select_relevant_shape_parts(nlq: str, shape: str, llm, label: str = None) ->
 
 
 # ---------------------------------------------------------------------------
-# Per-entity pipeline
+# Private pipeline helpers
 # ---------------------------------------------------------------------------
+
+def _resolve_label(label: str, kg_config: KGConfig) -> tuple:
+    """
+    Returns (label_clean, class_uri, resource_uri).
+    If label is already a full URI it is used as-is; otherwise
+    kg_config.label_transform is applied and namespace prefixes are prepended.
+    """
+    if label.startswith("http"):
+        local = label.rsplit("/", 1)[-1]
+        return local, label, label
+    clean = kg_config.label_transform(label) if kg_config.label_transform else label
+    return clean, kg_config.class_namespace + clean, kg_config.resource_namespace + clean
+
+
+def _get_class_items(class_uri: str, endpoint: str, kg_config: KGConfig) -> list:
+    """Fetch T-Box properties and merge in A-Box extra properties (deduped)."""
+    items = _tbox_to_prop_range_items(get_tbox_properties(class_uri, endpoint), kg_config)
+    extra = _tbox_to_prop_range_items(
+        get_abox_extra_properties(class_uri, endpoint, kg_config.abox_extra_namespaces),
+        kg_config,
+    )
+    seen = {item.split(" ->")[0].strip() for item in items}
+    items += [e for e in extra if e.split(" ->")[0].strip() not in seen]
+    return items
+
+
+def _get_entity_items(
+    resource_uri: str, label_clean: str, endpoint: str, kg_config: KGConfig
+) -> list:
+    """Run shexer for a named entity and parse the result into prop -> range items."""
+    shape_uri = kg_config.shape_namespace + label_clean
+    shex_str = _run_shexer_for_entity(resource_uri, shape_uri, endpoint, kg_config.namespaces_dict)
+    return _parse_shex_to_prop_range_items(shex_str)
+
 
 def _run_shexer_for_entity(
     entity_uri: str,
@@ -325,7 +377,6 @@ def _run_shexer_for_entity(
 ) -> str:
     """
     Run shexer for a single named entity and return the raw ShEx string.
-    Receives pre-built full URIs for the entity and shape.
     Returns empty string on failure.
     """
     shape_map_raw = f"<{entity_uri}>@<{shape_uri}>"
@@ -338,6 +389,7 @@ def _run_shexer_for_entity(
         )
         return shaper.shex_graph(string_output=True) or ""
     except Exception as e:
+        logging.warning(f"[_run_shexer_for_entity] shexer failed for <{entity_uri}>: {e}")
         return ""
 
 
@@ -360,9 +412,9 @@ def _process_entity_section(
     if not items:
         return ""
     enriched = add_possible_values_to_shape(items, endpoint, kg_config)
-    if not enriched.strip():
+    if not enriched:
         return ""
-    indented = "\n".join(f"  {line}" for line in enriched.splitlines())
+    indented = "\n".join(f"  {line}" for line in enriched)
     return f"{label_clean}:\n{indented}"
 
 
@@ -404,53 +456,18 @@ def generate_shape_generic(
         could be produced.
     """
     endpoint = kg_config.sparql_endpoint
-
     sections = []
+
     try:
         for label in entity_labels:
-            # --- URI passthrough -------------------------------------------
-            if isinstance(label, str) and label.startswith("http"):
-                # Label is already a full URI; extract local name for display.
-                local_name = label.rsplit("/", 1)[-1]
-                label_clean = local_name
-                class_uri = label
-                resource_uri = label
-            else:
-                # Apply KG-specific label normalization if configured.
-                if kg_config.label_transform is not None:
-                    label_clean = kg_config.label_transform(label)
-                else:
-                    label_clean = label
-                class_uri = kg_config.class_namespace + label_clean
-                resource_uri = kg_config.resource_namespace + label_clean
+            label_clean, class_uri, resource_uri = _resolve_label(label, kg_config)
 
             if _llm_classify(label_clean, shapes_llm):
-                # --- CLASS path: T-Box + optional A-Box extra properties ---
-                props = get_tbox_properties(class_uri, endpoint)
-                items = _tbox_to_prop_range_items(props, kg_config)
-
-                extra_props = get_abox_extra_properties(
-                    class_uri, endpoint, kg_config.abox_extra_namespaces
-                )
-                extra_items = _tbox_to_prop_range_items(extra_props, kg_config)
-
-                existing_props = {item.split(" ->")[0].strip() for item in items}
-                for extra_item in extra_items:
-                    key = extra_item.split(" ->")[0].strip()
-                    if key not in existing_props:
-                        items.append(extra_item)
-                        existing_props.add(key)
+                items = _get_class_items(class_uri, endpoint, kg_config)
             else:
-                # --- ENTITY path: shexer shape extraction ------------------
-                shape_uri = kg_config.shape_namespace + label_clean
-                shex_str = _run_shexer_for_entity(
-                    resource_uri, shape_uri, endpoint, kg_config.namespaces_dict
-                )
-                items = _parse_shex_to_prop_range_items(shex_str)
+                items = _get_entity_items(resource_uri, label_clean, endpoint, kg_config)
 
-            section = _process_entity_section(
-                label_clean, items, nlq, shapes_llm, endpoint, kg_config
-            )
+            section = _process_entity_section(label_clean, items, nlq, shapes_llm, endpoint, kg_config)
             if section:
                 sections.append(section)
 
@@ -458,10 +475,7 @@ def generate_shape_generic(
         logging.error(f"[generate_shape_generic] Failed: {e}", exc_info=True)
         return None
 
-    if not sections:
-        return None
-
-    return "\n\n".join(sections)
+    return "\n\n".join(sections) if sections else None
 
 
 # ---------------------------------------------------------------------------

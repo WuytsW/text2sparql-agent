@@ -295,6 +295,8 @@ class LLMAgent:
             ``translated_question``, ``query``, ``prompt_tokens``,
             ``completion_tokens``, ``requests``.
         """
+
+        log_message(step_name="Input question", color="Yellow", messages=[input_question])
         try:
             if model_name != self.current_model:
                 self._init_llms(model_name)

@@ -119,7 +119,7 @@ CLASS
 
 Examples:
 "Michael Jackson" → ENTITY
-"Country" → CLASS"""
+"River" → CLASS"""
 }
 
 entities_extraction_prompt_old = {

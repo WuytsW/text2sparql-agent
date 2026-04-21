@@ -33,12 +33,7 @@ Task: Construct the SPARQL query using the pre-computed entity URIs and KG shape
 
 last_task = {
     "en": """Make sure that the query is formatted correctly. No extra text. No markdown. Just plain SPARQL query.
-Determine whether to output a URI (SELECT ?uri), number (COUNT), date, boolean (ASK), string (SELECT ?label).
-- If the question is a yes/no question ("Are there any...", "Does X...", "Is there..."), use ASK WHERE { ... } instead of SELECT.
-- If the expected answer is a date (e.g. founding year, birth date), cast to xsd:date using: BIND(xsd:date(STR(?raw)) AS ?date)
-- If the question asks for a single list of things (people, places, etc.), use a single ?uri SELECT column. When two related entities are the answer, merge them into one column with UNION rather than using multiple SELECT variables.
-- Use only prefixes and properties that appear in the KG shape provided in context — do not guess or invent property names.
-- If the shape contained a property with controlled string values (e.g. [values: "X", "Y", ...]), use that as a direct mandatory filter.
+Determine whether to output a URI (SELECT ?uri), number (COUNT), date, boolean (ASK), string (SELECT ?label)
 """
 }
 
@@ -112,7 +107,7 @@ CLASS
 
 Examples:
 "Michael Jackson" → ENTITY
-"Country" → CLASS"""
+"River" → CLASS"""
 }
 
 entities_extraction_prompt_old = {

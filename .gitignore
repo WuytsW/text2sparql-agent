@@ -176,4 +176,4 @@ cython_debug/
 *.db
 
 # Call logs
-logs/log_calls.json
+logs/llm_calls.json
