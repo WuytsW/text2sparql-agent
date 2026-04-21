@@ -88,7 +88,7 @@ shape_selection_prompt = {
     "en": """Given the folowing question: "{nlq}", and the following shape: "{shape}"
     select the most relevant properties and classes from the shape that are likely to be useful for answering the question.
     Return a comma-separated list of properties and classes from the shape that are relevant to the question. Only select properties and classes that are likely to be useful for answering the question. Do not select all properties, only the most relevant ones.
-    Keep the formatting of the properties and classes as they are in the shape (Example:  dbo:deathPlace -> dbo:Place). 
+    Keep the formatting of the properties and classes as they are in the shape. 
     If the shape is empty, return an empty string."""
 }
 
@@ -109,7 +109,7 @@ A NAMED ENTITY is a unique, specific thing: a particular person, place, organiza
 Examples: "Michael Jackson", "Eiffel Tower", "Apple Inc.", "Uzi"
 
 A CLASS/TYPE is a general category that many things can belong to.
-Examples: "Animal", "Country", "Musical Artist", "Film", "Weapon", "City"
+Examples: "Country", "Musical Artist", "Film", "Weapon", "City"
 
 If "{label}" is a NAMED ENTITY, respond with exactly:
 ENTITY
@@ -119,7 +119,7 @@ CLASS
 
 Examples:
 "Michael Jackson" → ENTITY
-"Animal" → CLASS"""
+"Country" → CLASS"""
 }
 
 entities_extraction_prompt_old = {
@@ -163,7 +163,7 @@ Question: "{nlq}"
 
 Rules:
 - Return ONLY a comma-separated list of labels, no explanations.
-- Use singular form and capitalise as a DBpedia class would be (e.g. "Novelist" not "novelists").
+- Use singular form and capitalise as a DBpedia class would be (e.g. "Teacher" not "teachers").
 - Descriptive adjectives like "largest", "extinct", "female" are filters, NOT entities — do not include them.
 - Titles of creative works (books, films, games, albums, TV series, etc.) are single named entities regardless of how many words they contain. Treat the full title as one item (e.g. "The Pillars of the Earth", NOT "pillar", "earth").
 - Full person names must be kept together (e.g. "Abraham Lincoln" NOT "Abraham" or "Lincoln").

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import dataclasses; print\\('dataclasses available'\\)\")",
+      "Bash(python -c \"import dataclasses; import inspect; print\\(inspect.getsource\\(dataclasses.dataclass\\)\\)\")",
+      "Bash(pip show:*)"
+    ]
+  }
+}

@@ -1,0 +1,184 @@
+system_prompt = {
+    "en": """You are an intelligent Knowledge Graph-based Question Answering system that generates SPARQL queries over a Knowledge Graph (KG).
+    """
+}
+
+
+planner_prompt_dct = {
+    "en": """For the given objective, come up with a concise step by step plan to write a SPARQL query.
+Keep the plan SHORT — exactly 2 steps for most questions:
+  Step 1: "Generate the shape" (this is the ONLY step that calls tools — extract entities, link named entities via the entity linker, then generate the shape).
+  Step 2: "Construct the SPARQL query using the shape from step 1 and the entity URIs from the entity linker" (no tool calls — use what was already generated).
+Only add a third step if the question is genuinely complex (e.g. involves multiple unrelated entities or aggregations).
+Do NOT split entity extraction, entity linking, and shape generation into separate steps — all three tool calls happen together in step 1.
+Do NOT resolve, identify, or link any entities or properties yourself — that will be done by tools in the execution step.
+Do not add any superfluous steps.
+The result of the final step should be the final SPARQL query over the KG. Don't propose to execute the query.
+At the end step you MUST output exactly **ONE** SPARQL query string **without extra text or markdown**.
+
+Objective: {objective}
+
+Formatting instructions:
+Just output the valid JSON with the list of strings as follows: {{"plan": ["step1", "step2", ...]}} Put every step to the list
+Only output VALID JSON without escape chars: {{"plan": ["step1", "step2", ...]}}
+Make sure that the output is VALID JSON"""
+}
+
+execute_step_prompt = {
+    "en": """User question: {nlq}
+Task: Construct the SPARQL query using the pre-computed entity URIs and KG shape provided in the context
+    """
+}
+
+
+last_task = {
+    "en": """Make sure that the query is formatted correctly. No extra text. No markdown. Just plain SPARQL query.
+Determine whether to output a URI (SELECT ?uri), number (COUNT), date, boolean (ASK), string (SELECT ?label).
+- If the question is a yes/no question ("Are there any...", "Does X...", "Is there..."), use ASK WHERE { ... } instead of SELECT.
+- If the expected answer is a date (e.g. founding year, birth date), cast to xsd:date using: BIND(xsd:date(STR(?raw)) AS ?date)
+- If the question asks for a single list of things (people, places, etc.), use a single ?uri SELECT column. When two related entities are the answer, merge them into one column with UNION rather than using multiple SELECT variables.
+- Use only prefixes and properties that appear in the KG shape provided in context — do not guess or invent property names.
+- If the shape contained a property with controlled string values (e.g. [values: "X", "Y", ...]), use that as a direct mandatory filter.
+"""
+}
+
+feedback_step_dict = {
+    "en": """
+    This is feedback to your generated SPARQL query produced by executing it on a triplestore.
+    Please rework your query if necessary.
+
+    Initial question: {question}
+    Your query:
+    {query}
+
+    --- Start triplestore response ---
+    {feedback}
+    --- End triplestore response ---
+
+    If the triplestore response contains results, the query is CORRECT — return it UNCHANGED.
+    - Do NOT substitute concrete values from the results back into the query.
+    - Do NOT modify the WHERE clause, variable names, or triple patterns in any way.
+
+    If the results are empty or an error occurred, the query is WRONG. You MUST rewrite it.
+    Common fixes to try:
+    - Use properties from the KG shape instead of guessing property paths
+    - Remove overly restrictive type constraints that may not exist in the triplestore
+    - Try reversing the subject and object of the main triple — some properties have the named entity as the object, not the subject
+    - Add UNION patterns for alternative access paths (e.g. location via different properties)
+    - Check whether the shape offers a different predicate than the one in your query
+    - Try alternative property variants suggested by the shape (e.g. a raw/infobox property alongside an ontology property)
+    - If structured properties fail entirely, consider broader class or category membership patterns
+    - If the expected answer is a string literal (not a URI), look for a datatype property in the shape
+    - If a property lists controlled values (e.g. [values: "X", "Y", ...]), use the appropriate value as a MANDATORY filter — do NOT make it OPTIONAL.
+    Review the shape generated earlier in the conversation and write a corrected query.
+
+    {last_task}
+    """
+}
+
+
+shape_selection_prompt = {
+    "en": """Given the folowing question: "{nlq}", and the following shape: "{shape}"
+    select the most relevant properties and classes from the shape that are likely to be useful for answering the question.
+    Return a comma-separated list of properties and classes from the shape that are relevant to the question. Only select properties and classes that are likely to be useful for answering the question. Do not select all properties, only the most relevant ones.
+    Keep the formatting of the properties and classes as they are in the shape.
+    If the shape is empty, return an empty string."""
+}
+
+shape_selection_prompt_per_entity = {
+    "en": """Given the question: "{nlq}", and the following properties for "{label}":
+
+{shape}
+
+Select only the most relevant properties needed to answer the question. (If you are not sure about selecting a property, it's better to include it than to miss it. Altough, try to avoid including too many irrelevant properties as it may lead to slow query execution or empty results.)
+Return a comma-separated list in the exact format shown (e.g. ont:capital -> ont:City).
+If none are relevant, return an empty string."""
+}
+
+class_instances_prompt = {
+    "en": """Determine if the term "{label}" refers to a specific named entity or a general class/type of things.
+
+A NAMED ENTITY is a unique, specific thing: a particular person, place, organization, creative work, etc.
+Examples: "Michael Jackson", "Eiffel Tower", "Apple Inc.", "Uzi"
+
+A CLASS/TYPE is a general category that many things can belong to.
+Examples: "Country", "Musical Artist", "Film", "Weapon", "City"
+
+If "{label}" is a NAMED ENTITY, respond with exactly:
+ENTITY
+
+If "{label}" is a CLASS/TYPE, respond with exactly:
+CLASS
+
+Examples:
+"Michael Jackson" → ENTITY
+"Country" → CLASS"""
+}
+
+entities_extraction_prompt_old = {
+    "en": """Extract the entity and class labels needed to answer the following question with a SPARQL query.
+
+Question: "{nlq}"
+
+Rules:
+- Use singular form (e.g. "City" not "cities").
+- Descriptive adjectives like "extinct", "largest", "female" are filters, NOT entities — do not extract them.
+- Include a specific named entity only if the question refers to one (e.g. "Uzi", "Skype").
+- If the question contains names where both name and surname are mentioned, extract the full name (e.g. "Michael Jackson" NOT "Michael" or "Jackson").
+- If a named entity is referred to by only a partial name (surname, nickname, or single historical name), expand it (return only full names) to the most complete, commonly recognized full name (e.g. "Napoleon" → "Napoleon Bonaparte").
+- Only extract a class label if it appears as an explicit noun category in the question (e.g. "movies", "museums", "state"). Never extract "Person" — it is too generic to be useful. Use specific subclasses only if the question explicitly names them (e.g. "Actor", "Politician", "Writer").
+- Return ONLY a comma-separated list of labels, no explanations.
+
+Example: "Who developed Skype?"
+Result: "Skype"
+
+Example: "Which other weapons did the designer of the Uzi develop?"
+Result: "Uzi, Weapon"
+
+Example: "Which city in France has the most museums?"
+Result: "City, France"
+
+Example: "Which people were born in Heraklion?"
+Result: "Heraklion"
+
+Example: "Show me all museums in London."
+Result: "Museum, London"
+
+Example: "Where was Nikola Tesla born?"
+Result: "Nikola Tesla" NOT "Person"
+"""
+}
+
+entities_extraction_prompt = {
+"en": """Extract the entity and class labels needed to answer the following question with a SPARQL query.
+
+Question: "{nlq}"
+
+Rules:
+- Return ONLY a comma-separated list of labels, no explanations.
+- Use singular form (e.g. "Teacher" not "teachers").
+- Descriptive adjectives like "largest", "extinct", "female" are filters, NOT entities — do not include them.
+- Titles of creative works (books, films, games, albums, TV series, etc.) are single named entities regardless of how many words they contain. Treat the full title as one item (e.g. "The Pillars of the Earth", NOT "pillar", "earth").
+- Full person names must be kept together (e.g. "Abraham Lincoln" NOT "Abraham" or "Lincoln").
+- If a named entity is referred to only by a partial name, expand it to the most complete, commonly recognized form (e.g. "Napoleon" → "Napoleon Bonaparte").
+- Only include a class label if it appears as an explicit noun category in the question (e.g. "novelist", "weapon", "state"). Never extract "Person" — it is too generic.
+
+Example: "Who developed Skype?"
+Result: Skype
+
+Example: "Which other weapons did the designer of the Uzi develop?"
+Result: Uzi, Weapon
+
+Example: "Which city in France has the most museums?"
+Result: City, France
+
+Example: "Who wrote the book The Pillars of the Earth?"
+Result: The Pillars of the Earth
+
+Example: "Where was Nikola Tesla born?"
+Result: Nikola Tesla
+
+Example: "Show me all museums in London."
+Result: Museum, London
+"""
+}

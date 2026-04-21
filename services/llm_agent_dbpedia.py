@@ -20,6 +20,7 @@ from services.llm_utils import dbpedia_categories_tool, get_expected_answer_type
 from services.entity_linking import dbpedia_el
 from services.entity_extraction import extract_entities
 from services.shape_generation import generate_shape
+from services.shape_generation_generic import generate_shape_generic, DBPEDIA_CONFIG
 from services.ld_utils import execute, post_process
 from prompts.dbpedia import (
     system_prompt,
@@ -173,7 +174,8 @@ class LLMAgentDBpedia:
         shape = ""
         if shapes_step:
             try:
-                shape = generate_shape(nlq, entity_labels, self.shapes_llm)
+                # shape = generate_shape(nlq, entity_labels, self.shapes_llm)
+                shape = generate_shape_generic(nlq, entity_labels, self.shapes_llm, DBPEDIA_CONFIG)
                 log_message(step_name="Shape generation", color="Cyan", messages=[shape])
             except Exception as e:
                 shape = ""
