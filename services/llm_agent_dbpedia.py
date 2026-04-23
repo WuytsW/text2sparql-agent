@@ -33,7 +33,7 @@ class LLMAgentDBpedia:
     
     def __init__(
             self,
-            model_name: str = "openai/gpt-4o-mini",
+            model_name: str = "qwen/qwen-2.5-72b-instruct",
             embedding_model_name: str = "intfloat/multilingual-e5-large",
             return_N: int = 5,
             tools: List = [dbpedia_el],
@@ -280,7 +280,7 @@ LIMIT 10"""
 if __name__ == "__main__":   
 
     dbpedia_agent = LLMAgentDBpedia(
-        model_name="openai/gpt-4o-mini",
+        model_name="qwen/qwen-2.5-72b-instruct",
         embedding_model_name="intfloat/multilingual-e5-large",
         return_N=5,
         tools=[dbpedia_el],
