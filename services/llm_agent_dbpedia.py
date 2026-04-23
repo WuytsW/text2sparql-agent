@@ -119,7 +119,10 @@ class LLMAgentDBpedia:
             callbacks=[self.log_handler]
         )
 
-        self.tools = [dbpedia_categories_tool] + self._base_tools
+
+        #HERE
+        #self.tools = [dbpedia_categories_tool] + self._base_tools
+        self.tools = self._base_tools
 
         self.agent_runnable_execution_original = create_tool_calling_agent(self.llm_execution_original, self.tools, self.agent_prompt)
         self.agent_executor_original = AgentExecutor(
