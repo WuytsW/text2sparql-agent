@@ -1,5 +1,6 @@
 import logging
-
+import os
+from datetime import datetime
 
 BLACK   = "\033[30m"
 RED     = "\033[31m"
@@ -17,9 +18,20 @@ COLOR_MAP = {
     "Blue": BLUE, "Magenta": MAGENTA, "Cyan": CYAN, "White": WHITE,
 }
 
+_LOG_FILE = os.path.join(os.path.dirname(__file__), "..", "..", "logs", "messages.log")
+
+def _append_to_log(text: str):
+    os.makedirs(os.path.dirname(_LOG_FILE), exist_ok=True)
+    with open(_LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(text + "\n")
+
 def log_message(step_name: str, color: str = "White", messages: list = None):
     colorCode = COLOR_MAP.get(color, WHITE)
-    logging.info(f"{colorCode}[{step_name}]{RESET}")
+    header = f"{colorCode}[{datetime.now().strftime('%H:%M:%S')}][{step_name}]{RESET}"
+    logging.info(header)
+    _append_to_log(header)
     if messages:
         for message in messages:
-            print(f"{colorCode}{message}{RESET}")
+            line = f"{colorCode}{message}{RESET}"
+            print(line)
+            _append_to_log(line)
