@@ -3,7 +3,7 @@ from typing import List
 # from services.llm_agent import LLMAgent
 from services.llm_agent_dbpedia import LLMAgentDBpedia
 from services.llm_agent_corporate import LLMAgentCorporate
-
+from services.t2q_agent import T2QAgent
 
 __version__ = "0.1.0"
 
@@ -18,7 +18,8 @@ KNOWN_DATASETS: List[str] = [
     "https://text2sparql.aksw.org/2025/corporate/"
 ]
 
-dbpedia_agent = LLMAgentDBpedia()
+#dbpedia_agent = LLMAgentDBpedia()
+dbpedia_agent = T2QAgent()
 #corporate_agent = LLMAgentCorporate()
 
 @app.get("/api")

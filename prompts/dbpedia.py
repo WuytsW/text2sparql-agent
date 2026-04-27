@@ -156,6 +156,22 @@ Result: "Nikola Tesla" NOT "Person"
 """
 }
 
+shape_validation_prompt = {
+    "en": """You are evaluating whether a DBpedia shape is useful for answering a question.
+
+Question: "{question}"
+Entity labels extracted: {entity_labels}
+DBpedia URIs linked: {linked_uris}
+DBpedia shape:
+{shape}
+
+A shape is USEFUL if it contains at least one property relevant to answering the question and covers at least one main entity or class from the question.
+A shape is NOT USEFUL if it is empty, contains only irrelevant properties, misses the key entities needed, or the linked URIs point to the wrong entities.
+
+Respond with ONLY a JSON object (no markdown, no extra text):
+{{"useful": true_or_false, "reason": "one sentence", "suggestion": "if not useful: specific hint for improving entity extraction or entity linking; if useful: empty string"}}"""
+}
+
 entities_extraction_prompt = {
 "en": """Extract the DBpedia entity and class labels needed to answer the following question with a SPARQL query.
 

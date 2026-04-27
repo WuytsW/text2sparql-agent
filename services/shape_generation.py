@@ -200,11 +200,38 @@ def _query_property_values(prop_prefixed: str, sparql_endpoint: str) -> list:
     return values
 
 
-def add_possible_values_to_shape(relevant_items: list, sparql_endpoint: str) -> str:
+def _query_entity_property_values(entity_uri: str, prop_prefixed: str, endpoint: str) -> list:
+    """Query all values of a property for one specific entity (no cardinality cap)."""
+    prop_uri = _expand_prefixed(prop_prefixed)
+    if not prop_uri:
+        return []
+    query = f"SELECT DISTINCT ?val WHERE {{ <{entity_uri}> <{prop_uri}> ?val . }}"
+    try:
+        sparql = SPARQLWrapper(endpoint)
+        sparql.timeout = 15
+        sparql.setQuery(query)
+        sparql.setReturnFormat(JSON)
+        result = sparql.query().convert()
+    except Exception:
+        return []
+    values = []
+    for b in result.get("results", {}).get("bindings", []):
+        val_data = b.get("val", {})
+        val = val_data.get("value", "")
+        if not val:
+            continue
+        if val_data.get("type") == "uri":
+            values.append(_shorten_uri(val))
+        else:
+            values.append('"' + val + '"')
+    return values
+
+
+def add_possible_values_to_shape(relevant_items: list, sparql_endpoint: str, entity_uri: str = None) -> str:
     """
-    For each prop -> range item, queries the A-Box for distinct values using
-    cardinality filtering. Properties with few distinct values (controlled
-    vocabulary) get their values listed; others (e.g. scientificName) are left as-is.
+    For each prop -> range item, queries the A-Box for distinct values.
+    When entity_uri is given (named entity), queries values for that specific
+    entity instead of globally — avoids the >30-value cutoff for common props.
     """
     result_lines = []
     for item in relevant_items:
@@ -216,7 +243,10 @@ def add_possible_values_to_shape(relevant_items: list, sparql_endpoint: str) -> 
             result_lines.append(item)
             continue
         prop, range_ = m.group(1), m.group(2)
-        values = _query_property_values(prop, sparql_endpoint)
+        if entity_uri:
+            values = _query_entity_property_values(entity_uri, prop, sparql_endpoint)
+        else:
+            values = _query_property_values(prop, sparql_endpoint)
         if values:
             vals_str = ", ".join(values)
             result_lines.append(f"{prop} -> {range_} [values: {vals_str}]")
@@ -278,12 +308,32 @@ def _run_shexer_for_entity(label_clean: str, endpoint: str, namespaces_dict: dic
         return ""
 
 
+def _resolve_entity_uri(label_clean: str, entity_uris: dict) -> str | None:
+    """Find a DBpedia URI for label_clean from Falcon entity_uris dict.
+
+    Tries exact match, underscore-to-space variant, and suffix match against URI values.
+    """
+    if not entity_uris:
+        return None
+    label_spaced = label_clean.replace("_", " ")
+    for key, uri in entity_uris.items():
+        if key in (label_clean, label_spaced):
+            return uri
+    label_lower = label_spaced.lower()
+    for uri in entity_uris.values():
+        suffix = uri.rstrip("/").rsplit("/", 1)[-1].replace("_", " ").lower()
+        if suffix == label_lower:
+            return uri
+    return None
+
+
 def _process_entity_section(
     label_clean: str,
     items: list,
     nlq: str,
     llm,
     endpoint: str,
+    entity_uri: str = None,
 ) -> str:
     """
     Runs the filter -> values pipeline for one entity and returns a labeled
@@ -295,7 +345,7 @@ def _process_entity_section(
         items = select_relevant_shape_parts(nlq, "\n".join(items), llm, label=label_clean)
     if not items:
         return ""
-    enriched = add_possible_values_to_shape(items, endpoint)
+    enriched = add_possible_values_to_shape(items, endpoint, entity_uri=entity_uri)
     if not enriched.strip():
         return ""
     indented = "\n".join(f"  {line}" for line in enriched.splitlines())
@@ -326,7 +376,7 @@ _NAMESPACES_DICT = {
 }
 
 
-def generate_shape(nlq: str, entity_labels: list, shapes_llm):
+def generate_shape(nlq: str, entity_labels: list, shapes_llm, entity_uris: dict = None):
     load_dotenv(dotenv_path=".env")
     endpoint = os.getenv("DBPEDIA_SPARQL_URL")
     #logging.info(f"[generate_shape] Entity labels: {entity_labels}")
@@ -354,14 +404,17 @@ def generate_shape(nlq: str, entity_labels: list, shapes_llm):
                     if dbp_key not in existing_props:
                         items.append(dbp_item)
                         existing_props.add(dbp_key)
+                section = _process_entity_section(
+                    label_clean, items, nlq, shapes_llm, endpoint
+                )
             else:
                 #logging.info(f"[generate_shape] '{label_clean}' -> ENTITY (shexer path)")
                 shex_str = _run_shexer_for_entity(label_clean, endpoint, _NAMESPACES_DICT)
                 items = _parse_shex_to_prop_range_items(shex_str)
-
-            section = _process_entity_section(
-                label_clean, items, nlq, shapes_llm, endpoint
-            )
+                entity_uri = _resolve_entity_uri(label_clean, entity_uris or {})
+                section = _process_entity_section(
+                    label_clean, items, nlq, shapes_llm, endpoint, entity_uri=entity_uri
+                )
             if section:
                 sections.append(section)
 
