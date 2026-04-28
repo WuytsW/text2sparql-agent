@@ -55,8 +55,8 @@ class ShapeInput(BaseModel):
         description="List of DBpedia class or entity labels to generate shapes for, e.g. ['Germany'] or ['Scientist']"
     )
     use_llm: bool = Field(
-        default=False,
-        description="Whether to let the LLM filter the generated shape to only relevant parts"
+        default=True,
+        description="Whether to use the LLM to filter the shape to only relevant properties"
     )
 
 class EntityExtractionInput(BaseModel):
@@ -143,7 +143,7 @@ def make_generate_shape_tool(llm):
     """Factory that returns a generate_shape_tool bound to the given LLM."""
 
     @tool("generate_shape_tool", args_schema=ShapeInput)
-    def generate_shape_tool(nlq: str, entity_labels: list[str], use_llm: bool = False) -> str:
+    def generate_shape_tool(nlq: str, entity_labels: list[str], use_llm: bool = True) -> str:
         """
         Generate a DBpedia-oriented shape description for the given entity/class labels.
         Returns a text block with relevant properties and, when possible, controlled values.

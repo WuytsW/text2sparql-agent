@@ -376,7 +376,7 @@ _NAMESPACES_DICT = {
 }
 
 
-def generate_shape(nlq: str, entity_labels: list, shapes_llm, entity_uris: dict = None):
+def generate_shape(nlq: str, entity_labels: list, shapes_llm, entity_uris: dict = None, use_llm: bool = True):
     load_dotenv(dotenv_path=".env")
     endpoint = os.getenv("DBPEDIA_SPARQL_URL")
     #logging.info(f"[generate_shape] Entity labels: {entity_labels}")
@@ -388,6 +388,7 @@ def generate_shape(nlq: str, entity_labels: list, shapes_llm, entity_uris: dict 
             label_clean = label_clean[0].upper() + label_clean[1:]
             #logging.info(f"[generate_shape] Processing '{label_clean}'")
 
+            effective_llm = shapes_llm if use_llm else None
             if _llm_classify(label_clean, shapes_llm):
                 #logging.info(f"[generate_shape] '{label_clean}' -> CLASS (T-Box path)")
                 class_uri = f"http://dbpedia.org/ontology/{label_clean}"
@@ -405,7 +406,7 @@ def generate_shape(nlq: str, entity_labels: list, shapes_llm, entity_uris: dict 
                         items.append(dbp_item)
                         existing_props.add(dbp_key)
                 section = _process_entity_section(
-                    label_clean, items, nlq, shapes_llm, endpoint
+                    label_clean, items, nlq, effective_llm, endpoint
                 )
             else:
                 #logging.info(f"[generate_shape] '{label_clean}' -> ENTITY (shexer path)")
@@ -413,7 +414,7 @@ def generate_shape(nlq: str, entity_labels: list, shapes_llm, entity_uris: dict 
                 items = _parse_shex_to_prop_range_items(shex_str)
                 entity_uri = _resolve_entity_uri(label_clean, entity_uris or {})
                 section = _process_entity_section(
-                    label_clean, items, nlq, shapes_llm, endpoint, entity_uri=entity_uri
+                    label_clean, items, nlq, effective_llm, endpoint, entity_uri=entity_uri
                 )
             if section:
                 sections.append(section)
