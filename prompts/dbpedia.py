@@ -92,6 +92,16 @@ shape_selection_prompt = {
     If the shape is empty, return an empty string."""
 }
 
+iri_expansion_prompt = {
+    "en": """Given the question: "{nlq}", the entity "{label}" has the following properties that link to other named entities:
+
+{iri_props}
+
+Which of these linked entities should we explore in more detail to answer the question?
+Return ONLY a comma-separated list of property names.
+If none are relevant, return an empty string."""
+}
+
 shape_selection_prompt_per_entity = {
     "en": """Given the question: "{nlq}", and the following properties for "{label}":
 
@@ -167,6 +177,7 @@ DBpedia shape:
 
 A shape is USEFUL if it contains at least one property relevant to answering the question and covers at least one main entity or class from the question.
 A shape is NOT USEFUL if it is empty, contains only irrelevant properties, misses the key entities needed, or the linked URIs point to the wrong entities.
+Also look at the linked URIs and chek if they are valid for this question.
 
 Respond with ONLY a JSON object (no markdown, no extra text):
 {{"useful": true_or_false, "reason": "one sentence", "suggestion": "if not useful: specific hint for improving entity extraction or entity linking; if useful: empty string"}}"""

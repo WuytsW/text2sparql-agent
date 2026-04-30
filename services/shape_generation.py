@@ -8,6 +8,7 @@ from prompts.dbpedia import (
     shape_selection_prompt,
     shape_selection_prompt_per_entity,
     class_instances_prompt,
+    iri_expansion_prompt,
 )
 from SPARQLWrapper import SPARQLWrapper, JSON
 
@@ -33,6 +34,9 @@ _MAX_PROPS_WITHOUT_FILTER = 30
 
 # Matches "prop -> range" lines (with optional leading whitespace)
 _PROP_RANGE_RE = _re.compile(r"^\s*(\S+)\s*->\s*(\S+)\s*$")
+
+# Matches enriched lines with IRI range and concrete values: "prop -> IRI [values: dbr:X, ...]"
+_IRI_VALUES_RE = _re.compile(r"^\s*(\S+)\s*->\s*IRI\s*\[values:\s*(.+)\]\s*$")
 
 # Parses a single shexer ShEx statement line: "   dbo:capital  IRI  ;"
 _SHEX_STMT_RE = _re.compile(r"^\s{1,6}(\^?[\w:<>]+)\s+(@?[\w:<>\[\]]+)")
@@ -280,7 +284,23 @@ def select_relevant_shape_parts(nlq: str, shape: str, llm, label: str = None) ->
     else:
         prompt = shape_selection_prompt["en"].format(nlq=nlq, shape=shape)
     response = llm.invoke([HumanMessage(content=prompt)])
-    return [i.strip() for i in response.content.strip().split(",") if i.strip()]
+    suggested = [i.strip() for i in response.content.strip().split(",") if i.strip()]
+
+    # Build lookup from prop name -> original full item (shexer's authoritative version).
+    # This guards against the LLM hallucinating properties that shexer never found.
+    original_by_prop = {}
+    for line in shape.splitlines():
+        line = line.strip()
+        m = _PROP_RANGE_RE.match(line)
+        if m:
+            original_by_prop[m.group(1)] = line
+
+    validated = []
+    for item in suggested:
+        m = _PROP_RANGE_RE.match(item)
+        if m and m.group(1) in original_by_prop:
+            validated.append(original_by_prop[m.group(1)])
+    return validated
 
 
 # ---------------------------------------------------------------------------
@@ -352,6 +372,81 @@ def _process_entity_section(
     return f"{label_clean}:\n{indented}"
 
 
+def _expand_entity_links(
+    label_clean: str,
+    section: str,
+    nlq: str,
+    llm,
+    endpoint: str,
+    entity_uri: str = None,
+) -> list:
+    """
+    Given an already-generated entity section string, find all IRI-range properties
+    (with or without annotated values), ask the LLM which to follow, resolve values
+    on-the-fly for bare IRI props, run shexer on each linked entity, and return
+    additional section strings.
+    """
+    # Collect all IRI-range props; values list may be empty for unannotated ones
+    iri_props = {}
+    for line in section.splitlines():
+        line = line.strip()
+        m = _IRI_VALUES_RE.match(line)
+        if m:
+            prop, vals_str = m.group(1), m.group(2)
+            iri_vals = [v.strip() for v in vals_str.split(",") if v.strip().startswith("dbr:")]
+            iri_props[prop] = iri_vals
+            continue
+        m2 = _PROP_RANGE_RE.match(line)
+        if m2 and m2.group(2) == "IRI" and m2.group(1) not in iri_props:
+            iri_props[m2.group(1)] = []
+
+    if not iri_props or not llm:
+        return []
+
+    iri_props_text = "\n".join(
+        f"{prop} -> IRI" + (f" [values: {', '.join(vals)}]" if vals else "")
+        for prop, vals in iri_props.items()
+    )
+    prompt = iri_expansion_prompt["en"].format(
+        nlq=nlq, label=label_clean, iri_props=iri_props_text
+    )
+    response = llm.invoke([HumanMessage(content=prompt)])
+    selected_props = {p.strip() for p in response.content.strip().split(",") if p.strip()}
+
+    if not selected_props:
+        return []
+
+    eff_entity_uri = entity_uri or f"http://dbpedia.org/resource/{label_clean}"
+    sub_sections = []
+    seen_labels = set()
+    for prop in selected_props:
+        if prop not in iri_props:
+            continue
+        vals = iri_props[prop]
+        if not vals:
+            all_vals = _query_entity_property_values(eff_entity_uri, prop, endpoint)
+            vals = [v for v in all_vals if v.startswith("dbr:")]
+        for iri_prefixed in vals[:2]:
+            sub_label = iri_prefixed[4:]  # strip "dbr:"
+            if sub_label in seen_labels:
+                continue
+            seen_labels.add(sub_label)
+            shex_str = _run_shexer_for_entity(sub_label, endpoint, _NAMESPACES_DICT)
+            items = _parse_shex_to_prop_range_items(shex_str)
+            # Always filter sub-entity shapes — they won't hit the >30 threshold
+            # inside _process_entity_section, so force selection here.
+            if items and llm:
+                items = select_relevant_shape_parts(nlq, "\n".join(items), llm, label=sub_label)
+            sub_entity_uri = f"http://dbpedia.org/resource/{sub_label}"
+            sub_section = _process_entity_section(
+                sub_label, items, nlq, llm, endpoint, entity_uri=sub_entity_uri
+            )
+            if sub_section:
+                sub_sections.append(sub_section)
+
+    return sub_sections
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -415,6 +510,15 @@ def generate_shape(nlq: str, entity_labels: list, shapes_llm, entity_uris: dict 
                 section = _process_entity_section(
                     label_clean, items, nlq, shapes_llm, endpoint, entity_uri=entity_uri
                 )
+                if section:
+                    sections.append(section)
+                    if shapes_llm:
+                        sub_sections = _expand_entity_links(
+                            label_clean, section, nlq, shapes_llm, endpoint,
+                            entity_uri=entity_uri,
+                        )
+                        sections.extend(sub_sections)
+                section = None  # prevent double-append below
             if section:
                 sections.append(section)
 
