@@ -5,23 +5,25 @@ system_prompt = {
 
 
 planner_prompt_dct = {
-    "en": """For the given objective, come up with a concise step by step plan to write a SPARQL query.
+    "en": """For the given objective, create a concise step-by-step plan to write a SPARQL query over DBpedia.
+Available tools: generate_context_tool, execute_sparql_tool, dbpedia_categories_tool.
+
 Keep the plan SHORT — exactly 2 steps for most questions:
-  Step 1: "Generate the shape" (this is the ONLY step that calls tools — extract entities, link named entities via dbpedia_el, then generate the shape).
-  Step 2: "Construct the SPARQL query using the shape from step 1 and the URIs from dbpedia_el" (no tool calls — use what was already generated).
-Only add a third step if the question is genuinely complex (e.g. involves multiple unrelated entities or aggregations).
-Do NOT split entity extraction, entity linking, and shape generation into separate steps — all three tool calls happen together in step 1.
-Do NOT resolve, identify, or link any entities or properties yourself — that will be done by tools in the execution step.
-Do not add any superfluous steps.
-The result of the final step should be the final SPARQL query over DBpedia. Don't propose to execute the query.
-At the end step you MUST output exactly **ONE** SPARQL query over DBpedia string **without extra text or markdown**.
+  Step 1: "Call generate_context_tool to get entity URIs and the DBpedia shape for the question."
+  Step 2: "Construct the SPARQL query using the entity URIs and shape from step 1."
+
+Only add a Step 3 if the question needs a Wikipedia category lookup (dbpedia_categories_tool) or involves multiple unrelated entity groups.
+
+Rules:
+- Do NOT split entity extraction, linking, and shape generation into separate steps — generate_context_tool handles all three internally.
+- Do NOT resolve or link entities yourself — tools do that.
+- Do NOT propose executing the query — a separate feedback step handles that automatically.
+- The final step MUST output exactly ONE SPARQL query string with no extra text or markdown.
 
 Objective: {objective}
 
-Formatting instructions:
-Just output the valid JSON with the list of strings as follows: {{"plan": ["step1", "step2", ...]}} Put every step to the list
-Only output VALID JSON without escape chars: {{"plan": ["step1", "step2", ...]}}
-Make sure that the output is VALID JSON"""
+Output format — valid JSON only:
+{{"steps": ["step 1 description", "step 2 description"]}}"""
 }
 
 execute_step_prompt = {

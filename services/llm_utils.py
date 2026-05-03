@@ -13,6 +13,7 @@ from SPARQLWrapper import SPARQLWrapper, JSON as SPARQL_JSON
 from services.log_utils.log import log_message
 
 from services.shape_generation import generate_shape
+from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 
 
 
@@ -53,10 +54,6 @@ class ShapeInput(BaseModel):
     nlq: str = Field(description="The user's natural language question")
     entity_labels: list[str] = Field(
         description="List of DBpedia class or entity labels to generate shapes for, e.g. ['Germany'] or ['Scientist']"
-    )
-    use_llm: bool = Field(
-        default=False,
-        description="Whether to let the LLM filter the generated shape to only relevant parts"
     )
 
 class EntityExtractionInput(BaseModel):
@@ -143,7 +140,7 @@ def make_generate_shape_tool(llm):
     """Factory that returns a generate_shape_tool bound to the given LLM."""
 
     @tool("generate_shape_tool", args_schema=ShapeInput)
-    def generate_shape_tool(nlq: str, entity_labels: list[str], use_llm: bool = False) -> str:
+    def generate_shape_tool(nlq: str, entity_labels: list[str]) -> str:
         """
         Generate a DBpedia-oriented shape description for the given entity/class labels.
         Returns a text block with relevant properties and, when possible, controlled values.
@@ -152,12 +149,101 @@ def make_generate_shape_tool(llm):
             nlq=nlq,
             entity_labels=entity_labels,
             shapes_llm=llm,
-            use_llm=use_llm,
         )
 
         return result or "No shape could be generated."
 
     return generate_shape_tool
+
+
+class EntityLinkingInput(BaseModel):
+    nlq: str = Field(description="The natural language question")
+    ne_list: list = Field(description="List of named entity strings to link to DBpedia URIs")
+
+
+def make_entity_linking_tool():
+    """Factory that returns an entity_linking_tool wrapping dbpedia_el."""
+    from services.entity_linking import dbpedia_el
+
+    @tool("entity_linking_tool", args_schema=EntityLinkingInput)
+    def entity_linking_tool(nlq: str, ne_list: list) -> str:
+        """
+        Links named entities to DBpedia URIs using the Falcon entity linking service.
+        Call this after extract_entities_tool to get DBpedia resource URIs.
+        Returns a JSON string of linking candidates: [{"label": "...", "uri": "..."}, ...]
+        """
+        result = dbpedia_el(nlq, ne_list)
+        log_message(step_name="Entity linking (tool)", color="Cyan", messages=[str(result)])
+        return json.dumps(result)
+
+    return entity_linking_tool
+
+
+class ExecuteSPARQLInput(BaseModel):
+    query: str = Field(description="The SPARQL query string to execute against DBpedia")
+
+
+def make_execute_sparql_tool(endpoint: str):
+    """Factory that returns an execute_sparql_tool bound to the given SPARQL endpoint."""
+    from services.ld_utils import execute
+
+    @tool("execute_sparql_tool", args_schema=ExecuteSPARQLInput)
+    def execute_sparql_tool(query: str) -> str:
+        """
+        Executes a SPARQL query against the DBpedia endpoint.
+        Returns the first 5 result bindings as a JSON string, or an error message.
+        Use this to verify that your generated SPARQL query returns results.
+        """
+        try:
+            result = execute(query=query, endpoint_url=endpoint)
+            if isinstance(result, dict) and "error" not in result:
+                bindings = result.get("results", {}).get("bindings", [])[:5]
+                return json.dumps(bindings)
+            return json.dumps(result)
+        except Exception as e:
+            return f"Error: {str(e)}"
+
+    return execute_sparql_tool
+
+
+class GenerateContextInput(BaseModel):
+    nlq: str = Field(description="The natural language question to generate DBpedia context for")
+
+
+def make_generate_context_tool(context_llm, entities_llm, shapes_llm, agent_prompt):
+    """
+    Factory that returns a generate_context_tool that deterministically orchestrates
+    entity extraction, entity linking, and shape generation via direct function calls.
+    """
+    from services.entity_extraction import extract_entities
+    from services.entity_linking import dbpedia_el
+
+    @tool("generate_context_tool", args_schema=GenerateContextInput)
+    def generate_context_tool(nlq: str) -> str:
+        """
+        Generates entity URIs and a DBpedia shape for a natural language question.
+        Internally: (1) extracts entities, (2) links them to DBpedia URIs,
+        (3) generates a DBpedia shape. Returns a formatted context block.
+        Call this FIRST before constructing any SPARQL query.
+        """
+        try:
+            entity_labels = extract_entities(nlq, entities_llm)
+            log_message(step_name="Extracted entities", color="Cyan", messages=[str(entity_labels)])
+
+            entity_uris = dbpedia_el(nlq, entity_labels)
+            log_message(step_name="Entity linking", color="Cyan", messages=[str(entity_uris)])
+
+            shape = generate_shape(nlq=nlq, entity_labels=entity_labels, shapes_llm=shapes_llm)
+
+            return (
+                f"Entity URIs: {json.dumps(entity_uris)}\n"
+                f"Shape: {shape or 'No shape generated.'}"
+            )
+        except Exception as e:
+            return f"Context generation failed: {str(e)}"
+
+    return generate_context_tool
+
 
 def get_corporate_entities(query: str, is_relation: bool) -> list:
     """
