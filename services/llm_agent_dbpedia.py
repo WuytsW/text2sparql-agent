@@ -5,6 +5,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from langchain_community.callbacks import get_openai_callback
+from langgraph.graph import StateGraph, END
 from dotenv import load_dotenv
 from services.log_utils.LogLLMCallbackHandler import LogLLMCallbackHandler
 from services.log_utils.log import log_message
@@ -16,16 +17,21 @@ import os
 import json
 import logging
 
-from services.llm_utils import dbpedia_categories_tool, get_expected_answer_type
-from services.entity_linking import dbpedia_el
-from services.entity_extraction import extract_entities
-from services.shape_generation import generate_shape
+from services.llm_utils import (
+    dbpedia_categories_tool,
+    get_expected_answer_type,
+    Plan,
+    make_entity_linking_tool,
+    make_execute_sparql_tool,
+    make_generate_context_tool,
+)
 from services.ld_utils import execute, post_process
+from model.agent import PlanExecute
 from prompts.dbpedia import (
     system_prompt,
     last_task,
     feedback_step_dict,
-    execute_step_prompt
+    planner_prompt_dct,
 )
 
 
@@ -73,6 +79,7 @@ class LLMAgentDBpedia:
         ### START Initialize agent
         self._base_tools = tools
         self.current_model = model_name
+        self.app = None
 
         client = Client()
         self.agent_prompt = client.pull_prompt("hwchase17/openai-functions-agent")
@@ -119,18 +126,34 @@ class LLMAgentDBpedia:
             callbacks=[self.log_handler]
         )
 
+        self.plan_llm = ChatOpenAI(
+            model=model_name,
+            api_key=os.getenv("mKGQAgent_Plan_LLM", os.getenv("mKGQAgent_Execution_original_LLM")),
+            base_url="https://openrouter.ai/api/v1",
+            callbacks=[self.log_handler]
+        ).with_structured_output(Plan)
 
-        #HERE
-        #self.tools = [dbpedia_categories_tool] + self._base_tools
-        self.tools = self._base_tools
-
-        self.agent_runnable_execution_original = create_tool_calling_agent(self.llm_execution_original, self.tools, self.agent_prompt)
-        self.agent_executor_original = AgentExecutor(
-            agent=self.agent_runnable_execution_original, tools=self.tools, verbose=False
+        self.context_llm = ChatOpenAI(
+            model=model_name,
+            api_key=os.getenv("mKGQAgent_Context_LLM", os.getenv("mKGQAgent_Execution_original_LLM")),
+            base_url="https://openrouter.ai/api/v1",
+            callbacks=[self.log_handler]
         )
 
-        self.current_model = model_name
+        generate_context_tool = make_generate_context_tool(
+            self.context_llm, self.entities_llm, self.shapes_llm, self.agent_prompt
+        )
+        execute_sparql_tool = make_execute_sparql_tool(self.sparql_endpoint)
 
+        self.tools = [generate_context_tool, execute_sparql_tool, dbpedia_categories_tool] + self._base_tools
+
+        self.agent_runnable = create_tool_calling_agent(self.llm_execution_original, self.tools, self.agent_prompt)
+        self.agent_executor = AgentExecutor(
+            agent=self.agent_runnable, tools=self.tools, verbose=False
+        )
+
+        self.app = None  # reset workflow on model change
+        self.current_model = model_name
 
     def _translate_step(self, nlq: str):
         translated_question = translate_question(nlq, self.translation_llm)
@@ -152,86 +175,93 @@ class LLMAgentDBpedia:
         except Exception as e:
             log_message(step_name="Expected answer type failed", color="Red", messages=[str(e)])
 
-
-    def _context_step(self, chat_history: list, nlq: str, shapes_step: bool):
-        """Extract entities, link via DBpedia EL, generate shape, append context to chat_history."""
-        
-        # Entity extraction
+    def _plan_step(self, state: PlanExecute):
         try:
-            entity_labels = extract_entities(nlq, self.entities_llm)
-            log_message(step_name="Entity extraction", color="Cyan", messages=[str(entity_labels)])
+            plan = self.plan_llm.invoke(
+                planner_prompt_dct[self.lang].format(objective=state["input"])
+            )
+            return {"plan": plan.steps + [last_task[self.lang]]}
         except Exception as e:
-            entity_labels = []
-            log_message(step_name="Entity extraction failed", color="Red", messages=[str(e)])
-        
-        # Entity linking
-        try:
-            linked = dbpedia_el(nlq, entity_labels)
-            log_message(step_name="Entity linking", color="Cyan", messages=[linked])
-        except Exception as e:
-            linked = []
-            log_message(step_name="Entity linking failed", color="Red", messages=[str(e)])
+            log_message(step_name="Plan step failed", color="Red", messages=[str(e)])
+            return {"plan": [last_task[self.lang]]}
 
-        # Shape generation
-        shape = ""
-        if shapes_step:
-            try:
-                shape = generate_shape(nlq, entity_labels, self.shapes_llm)
-                log_message(step_name="Shape generation", color="Cyan", messages=[shape])
-            except Exception as e:
-                shape = ""
-                log_message(step_name="Shape generation failed", color="Red", messages=[str(e)])
+    def _agent_step(self, state: PlanExecute):
+        task = state["feedback_task"] if state["gave_feedback"] else state["plan"].pop(0)
+        log_message(step_name="Agent task", color="Cyan", messages=[task])
 
-
-        # Compile context message    
-        context_parts = []
-        if linked:
-            context_parts.append(f"Entity URIs from DBpedia: {json.dumps(linked)}")
-        if shape:
-            context_parts.append(f"DBpedia shape:\n{shape}")
-        if context_parts:
-            context_msg = "\n\n".join(context_parts)
-            chat_history.append(HumanMessage(content=context_msg))
-            log_message(step_name="Entity linking context added", color="Yellow", messages=[context_msg])
-
-    def _execute_step(self, task: str, chat_history: list) -> str:
-        """Run the agent executor and append the result to chat_history. Returns agent output."""
-        log_message(step_name="Execute task", color="Cyan", messages=[task])
+        task_input = f"User question: '{state['input']}'\nTask: {task}"
 
         try:
-            agent_response = self.agent_executor_original.invoke({"input": task, "chat_history": chat_history})
+            agent_response = self.agent_executor.invoke(
+                {"input": task_input, "chat_history": state["chat_history"]}
+            )
             output = agent_response["output"]
         except Exception as e:
             output = str(e)
+            agent_response = {"output": output, "intermediate_steps": []}
 
-        chat_history.append(HumanMessage(task))
-        chat_history.append(AIMessage(output))
-        log_message(step_name="Execute response", color="Yellow", messages=[output])
-        return output
+        state["chat_history"].append(AIMessage(output))
+        log_message(step_name="Agent response", color="Yellow", messages=[output])
 
-    def _feedback_step(self, chat_history: list, nlq: str) -> tuple:
-        """Execute the current SPARQL query and return (feedback_task, has_results)."""
-        current_query = chat_history[-1].content
+        return {
+            "past_steps": [task, output],
+            "intermediate_steps": [task, agent_response.get("intermediate_steps", [])],
+            "gave_feedback": state["gave_feedback"],
+        }
+
+    def _feedback_step(self, state: PlanExecute):
+        current_query = state["chat_history"][-1].content
         feedback_has_results = False
         try:
             feedback = execute(query=current_query, endpoint_url=self.sparql_endpoint)
             if isinstance(feedback, dict) and "error" not in feedback:
-                bindings = feedback['results']['bindings'][:3]
+                bindings = feedback.get("results", {}).get("bindings", [])[:3]
                 if bindings:
                     feedback_has_results = True
                 feedback = json.dumps(bindings)
         except Exception as e:
             feedback = str(e)
 
-        log_message(step_name="Feedback", color="Yellow", messages=[feedback])
+        log_message(step_name="Feedback", color="Yellow", messages=[str(feedback)])
 
         feedback_task = str(feedback_step_dict[self.lang].format(
-            question=nlq,
+            question=state["input"],
             query=current_query,
             feedback=feedback,
             last_task=last_task[self.lang]
         ))
-        return feedback_task, feedback_has_results
+        return {
+            "feedback_task": feedback_task,
+            "gave_feedback": True,
+            "feedback_has_results": feedback_has_results,
+        }
+
+    def _feedback_router(self, state: PlanExecute):
+        if len(state["plan"]) > 0:
+            return "agent"
+        if not state["gave_feedback"]:
+            return "feedback"
+        return END
+
+    def _init_workflow(self):
+        workflow = StateGraph(PlanExecute)
+
+        workflow.add_node("planner", self._plan_step)
+        workflow.add_node("agent", self._agent_step)
+        workflow.add_node("feedback", self._feedback_step)
+
+        workflow.set_entry_point("planner")
+        workflow.add_edge("planner", "agent")
+
+        workflow.add_conditional_edges(
+            "agent",
+            self._feedback_router,
+            {"feedback": "feedback", "agent": "agent", END: END}
+        )
+
+        workflow.add_edge("feedback", "agent")
+
+        self.app = workflow.compile()
 
     def get_similar_examples(self, input_question: str) -> str:
         results = self.icl_db.similarity_search_with_score(input_question, k=self.return_N)
@@ -254,6 +284,7 @@ class LLMAgentDBpedia:
             input_question: The natural language question
             model_name: OpenRouter model identifier (e.g. "openai/gpt-4o-mini")
             log_calls: If True, log LLM calls
+            shape_step: Kept for API compatibility (shape generation is always active via generate_context_tool)
 
         Returns:
             Dict with translated_question, query, prompt_tokens, completion_tokens, requests
@@ -261,27 +292,32 @@ class LLMAgentDBpedia:
         try:
             if model_name != self.current_model:
                 self._init_llms(model_name)
-
-
-            chat_history = [SystemMessage(content=system_prompt[self.lang])]
+            if self.app is None:
+                self._init_workflow()
 
             self.log_handler.reset(input_question, enabled=log_calls)
+            chat_history = [SystemMessage(content=system_prompt[self.lang])]
+
             with get_openai_callback() as cb:
                 translated_question = self._translate_step(input_question)
                 self._eat_step(chat_history, translated_question)
                 self._get_similar_examples_step(chat_history, translated_question)
-                self._context_step(chat_history, translated_question, shape_step)
 
-                self._execute_step(str(execute_step_prompt[self.lang].format(nlq=translated_question)), chat_history)
+                result = self.app.invoke(
+                    {
+                        "input": translated_question,
+                        "chat_history": chat_history,
+                        "gave_feedback": False,
+                        "plan": [],
+                        "past_steps": [],
+                        "intermediate_steps": [],
+                        "feedback_task": "",
+                        "feedback_has_results": False,
+                    },
+                    config={"callbacks": [self.log_handler]}
+                )
 
-                feedback_task, has_results = self._feedback_step(chat_history, translated_question)
-                if not has_results:
-                    self._execute_step(feedback_task, chat_history)
-
-
-
-
-            sparql_result = chat_history[-1].content
+            sparql_result = result["chat_history"][-1].content
             generated_query = post_process(sparql_result)
             log_message(step_name="Generated SPARQL query", color="Green", messages=[generated_query])
             self.log_handler._flush_to_file(generated_query)
@@ -291,16 +327,17 @@ class LLMAgentDBpedia:
                 "query": generated_query,
                 "prompt_tokens": cb.prompt_tokens,
                 "completion_tokens": cb.completion_tokens,
-                "requests": cb.successful_requests
+                "requests": cb.successful_requests,
             }
 
         except Exception as e:
             logging.error(f"Error in generate_sparql: {e}")
             return {
+                "translated_question": input_question,
                 "query": "SELECT ?s ?p ?o WHERE { ?s ?p ?o } LIMIT 10",
                 "prompt_tokens": 0,
                 "completion_tokens": 0,
-                "requests": 0
+                "requests": 0,
             }
 
 
