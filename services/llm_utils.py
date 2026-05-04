@@ -58,7 +58,7 @@ class ShapeInput(BaseModel):
 
 class EntityExtractionInput(BaseModel):
     nlq: str = Field(description="The user's natural language question to extract entities from")
-
+    
 @tool("wikidata_el", args_schema=NELInput)
 def wikidata_el(ne_list: list) -> list:
     """Performs entity linking to Wikidata based on the provided list of named entity strings. Returns list of dict with linking candidates: [{"label": "URI"}]"""
@@ -206,50 +206,33 @@ def make_execute_sparql_tool(endpoint: str):
     return execute_sparql_tool
 
 
-class GenerateContextInput(BaseModel):
-    nlq: str = Field(description="The natural language question to generate DBpedia context for")
+class ShapeCheckInput(BaseModel):
+    nlq: str = Field(description="The natural language question")
+    shape: str = Field(description="The DBpedia shape text to evaluate")
 
 
-def make_generate_context_tool(context_llm, entities_llm, shapes_llm, agent_prompt):
-    """
-    Factory that returns a generate_context_tool that deterministically orchestrates
-    entity extraction, entity linking, and shape generation via direct function calls.
-    """
-    from services.entity_extraction import extract_entities
-    from services.entity_linking import dbpedia_el
+def make_shape_check_tool(llm):
+    """Factory that returns a shape_check_tool bound to the given LLM."""
+    from prompts.dbpedia import shape_check_prompt
 
-    _cache = {}
-
-    @tool("generate_context_tool", args_schema=GenerateContextInput)
-    def generate_context_tool(nlq: str) -> str:
+    @tool("shape_check_tool", args_schema=ShapeCheckInput)
+    def shape_check_tool(nlq: str, shape: str) -> dict:
         """
-        Generates entity URIs and a DBpedia shape for a natural language question.
-        Internally: (1) extracts entities, (2) links them to DBpedia URIs,
-        (3) generates a DBpedia shape. Returns a formatted context block.
-        Call this FIRST before constructing any SPARQL query.
+        Evaluates whether a DBpedia shape is useful for answering the question.
+        Returns a dict with 'valid' (bool) and 'reason' (str).
         """
-        if nlq in _cache:
-            return _cache[nlq]
+        import json as _json
+        prompt = shape_check_prompt["en"].format(nlq=nlq, shape=shape or "(empty)")
+        response = llm.invoke([{"role": "user", "content": prompt}])
+        raw = response.content.strip()
         try:
-            entity_labels = extract_entities(nlq, entities_llm)
-            log_message(step_name="Extracted entities", color="Cyan", messages=[str(entity_labels)])
+            result = _json.loads(raw)
+            return {"valid": bool(result.get("valid", False)), "reason": result.get("reason", "")}
+        except Exception:
+            valid = "true" in raw.lower() and "false" not in raw.lower()
+            return {"valid": valid, "reason": raw}
 
-            entity_uris = dbpedia_el(nlq, entity_labels)
-            log_message(step_name="Entity linking", color="Cyan", messages=[str(entity_uris)])
-
-            shape = generate_shape(nlq=nlq, entity_labels=entity_labels, shapes_llm=shapes_llm)
-
-            result = (
-                f"Entity URIs: {json.dumps(entity_uris)}\n"
-                f"Shape: {shape or 'No shape generated.'}"
-            )
-            _cache[nlq] = result
-            return result
-        except Exception as e:
-            return f"Context generation failed: {str(e)}"
-
-    generate_context_tool._cache = _cache
-    return generate_context_tool
+    return shape_check_tool
 
 
 def get_corporate_entities(query: str, is_relation: bool) -> list:

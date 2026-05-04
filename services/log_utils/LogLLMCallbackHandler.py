@@ -56,8 +56,8 @@ class LogLLMCallbackHandler(BaseCallbackHandler):
         for grp in msgs:
             for m in grp:
                 content = m["content"].replace("\n", " ").strip()
-                if len(content) > 1000:
-                    content = content[:1000] + "..."
+                if len(content) > 5000:
+                    content = content[:5000] + "..."
                 lines.append(f"  [{m['type'].upper()}]: {content}")
         return "\n".join(lines)
 

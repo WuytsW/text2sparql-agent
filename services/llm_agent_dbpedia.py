@@ -20,17 +20,14 @@ import logging
 from services.llm_utils import (
     dbpedia_categories_tool,
     get_expected_answer_type,
-    Plan,
-    make_entity_linking_tool,
-    make_generate_context_tool,
 )
+from services.context_graph import make_context_graph
 from services.ld_utils import execute, post_process
 from model.agent import PlanExecute
 from prompts.dbpedia import (
     system_prompt,
     last_task,
     feedback_step_dict,
-    planner_prompt_dct,
 )
 
 
@@ -125,26 +122,18 @@ class LLMAgentDBpedia:
             callbacks=[self.log_handler]
         )
 
-        self.plan_llm = ChatOpenAI(
-            model=model_name,
-            api_key=os.getenv("mKGQAgent_Plan_LLM", os.getenv("mKGQAgent_Execution_original_LLM")),
-            base_url="https://openrouter.ai/api/v1",
-            callbacks=[self.log_handler]
-        ).with_structured_output(Plan)
-
-        self.context_llm = ChatOpenAI(
+        self.shape_check_llm = ChatOpenAI(
             model=model_name,
             api_key=os.getenv("mKGQAgent_Context_LLM", os.getenv("mKGQAgent_Execution_original_LLM")),
             base_url="https://openrouter.ai/api/v1",
             callbacks=[self.log_handler]
         )
 
-        generate_context_tool = make_generate_context_tool(
-            self.context_llm, self.entities_llm, self.shapes_llm, self.agent_prompt
+        self._context_graph = make_context_graph(
+            self.entities_llm, self.shapes_llm, self.shape_check_llm
         )
-        self._context_cache = generate_context_tool._cache
 
-        self.tools = [generate_context_tool, dbpedia_categories_tool] + self._base_tools
+        self.tools = [dbpedia_categories_tool] + self._base_tools
 
         self.agent_runnable = create_tool_calling_agent(self.llm_execution_original, self.tools, self.agent_prompt)
         self.agent_executor = AgentExecutor(
@@ -179,19 +168,35 @@ class LLMAgentDBpedia:
             log_message(step_name="Expected answer type failed", color="Red", messages=[str(e)])
 
     def _plan_step(self, state: PlanExecute):
-        try:
-            plan = self.plan_llm.invoke(
-                planner_prompt_dct[self.lang].format(objective=state["input"])
-            )
-            return {"plan": [["Call generate_context_tool to gather entity URIs and the DBpedia shape. Do NOT write a SPARQL query yet — only return the context.", "Using the entity URIs and DBpedia shape from the previous step, construct and output the SPARQL query.", last_task[self.lang]]]}
-            return {"plan": plan.steps + [last_task[self.lang]]}
-        except Exception as e:
-            log_message(step_name="Plan step failed", color="Red", messages=[str(e)])
-            return {"plan": [last_task[self.lang]]}
+        return {"plan": ["generate SPARQL query with the context provided in the chat history", last_task[self.lang]]}
+
+    def _context_step(self, state: PlanExecute):
+        result = self._context_graph.invoke({
+            "nlq": state["input"],
+            "retry_count": 0,
+            "failed_attempts": [],
+            "entities": [],
+            "entity_uris": [],
+            "shape": "",
+            "check_valid": False,
+            "check_reason": "",
+            "accepted_shape": None,
+            "accepted_entity_uris": None,
+        })
+
+        accepted_shape = result.get("accepted_shape") or result.get("shape") or "No shape generated."
+        entity_uris = result.get("accepted_entity_uris") or result.get("entity_uris") or []
+
+        context_msg = (
+            f"Entity URIs: {json.dumps(entity_uris)}\n"
+            f"Shape:\n{accepted_shape}"
+        )
+        log_message(step_name="Context generated", color="Cyan", messages=[context_msg])
+        return {"chat_history": state["chat_history"] + [AIMessage(content=context_msg)]}
 
     def _agent_step(self, state: PlanExecute):
         task = state["feedback_task"] if state["gave_feedback"] else state["plan"].pop(0)
-        log_message(step_name="Agent task", color="Cyan", messages=[task])
+        log_message(step_name="Agent task", color="Cyan", messages=[str(task)])
 
         task_input = f"User question: '{state['input']}'\nTask: {task}"
 
@@ -203,18 +208,6 @@ class LLMAgentDBpedia:
         except Exception as e:
             output = str(e)
             agent_response = {"output": output, "intermediate_steps": []}
-
-        intermediate = agent_response.get("intermediate_steps", [])
-        logging.info(f"[DEBUG] intermediate_steps len={len(intermediate)}")
-        context_added = False
-        for idx, step in enumerate(intermediate):
-            act, obs = step[0], step[1]
-            logging.info(f"[DEBUG] step[{idx}]: type={type(act).__name__}, tool={getattr(act, 'tool', 'NONE')}")
-            if hasattr(act, "tool") and act.tool == "generate_context_tool":
-                if not obs.startswith("Context generation failed:"):
-                    state["chat_history"].append(AIMessage(obs))
-                    context_added = True
-        logging.info(f"[DEBUG] Context passed to chat_history: {context_added}")
 
         state["chat_history"].append(AIMessage(output))
         log_message(step_name="Agent response", color="Yellow", messages=[output])
@@ -272,11 +265,13 @@ class LLMAgentDBpedia:
         workflow = StateGraph(PlanExecute)
 
         workflow.add_node("planner", self._plan_step)
+        workflow.add_node("context", self._context_step)
         workflow.add_node("agent", self._agent_step)
         workflow.add_node("feedback", self._feedback_step)
 
         workflow.set_entry_point("planner")
-        workflow.add_edge("planner", "agent")
+        workflow.add_edge("planner", "context")
+        workflow.add_edge("context", "agent")
 
         workflow.add_conditional_edges(
             "agent",
@@ -321,7 +316,7 @@ class LLMAgentDBpedia:
                 self._init_workflow()
 
             self.log_handler.reset(input_question, enabled=log_calls)
-            self._context_cache.clear()
+
             chat_history = [SystemMessage(content=system_prompt[self.lang])]
 
             with get_openai_callback() as cb:

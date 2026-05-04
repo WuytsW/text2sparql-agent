@@ -8,17 +8,22 @@ from services.log_utils.log import log_message
 
 load_dotenv(dotenv_path=".env")
 
-def extract_entities(question, llm):
+def extract_entities(question, llm, failed_attempts: list = None):
     """
-    Extracts entities from the given question using an LLM and resolves them against a SPARQL endpoint.
+    Extracts entities from the given question using an LLM.
+    failed_attempts: list of dicts [{entities, shape, reason}] from prior shape-check failures.
     """
-
-    """
-    Uses an LLM to extract the most relevant entities from a natural language query.
-    Cleans and parses the extracted entity names into a clean Python list of strings.
-    """
-
     user_prompt = entities_extraction_prompt["en"].format(nlq=question)
+
+    if failed_attempts:
+        retry_lines = "\n".join(
+            f"- Entities tried: {', '.join(a.get('entities', []))} — Reason failed: {a.get('reason', '')}"
+            for a in failed_attempts
+        )
+        user_prompt += (
+            f"\n\nPreviously tried entity labels that produced unhelpful shapes — "
+            f"avoid these and try alternative labels:\n{retry_lines}"
+        )
 
     response = llm.invoke([
         SystemMessage(content="You are an expert in extracting named entities from questions."),
