@@ -218,6 +218,8 @@ def make_generate_context_tool(context_llm, entities_llm, shapes_llm, agent_prom
     from services.entity_extraction import extract_entities
     from services.entity_linking import dbpedia_el
 
+    _cache = {}
+
     @tool("generate_context_tool", args_schema=GenerateContextInput)
     def generate_context_tool(nlq: str) -> str:
         """
@@ -226,6 +228,8 @@ def make_generate_context_tool(context_llm, entities_llm, shapes_llm, agent_prom
         (3) generates a DBpedia shape. Returns a formatted context block.
         Call this FIRST before constructing any SPARQL query.
         """
+        if nlq in _cache:
+            return _cache[nlq]
         try:
             entity_labels = extract_entities(nlq, entities_llm)
             log_message(step_name="Extracted entities", color="Cyan", messages=[str(entity_labels)])
@@ -235,13 +239,16 @@ def make_generate_context_tool(context_llm, entities_llm, shapes_llm, agent_prom
 
             shape = generate_shape(nlq=nlq, entity_labels=entity_labels, shapes_llm=shapes_llm)
 
-            return (
+            result = (
                 f"Entity URIs: {json.dumps(entity_uris)}\n"
                 f"Shape: {shape or 'No shape generated.'}"
             )
+            _cache[nlq] = result
+            return result
         except Exception as e:
             return f"Context generation failed: {str(e)}"
 
+    generate_context_tool._cache = _cache
     return generate_context_tool
 
 

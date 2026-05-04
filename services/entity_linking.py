@@ -1,4 +1,5 @@
 import requests
+from concurrent.futures import ThreadPoolExecutor
 
 
 def falcon_external(text: str):
@@ -16,8 +17,11 @@ def dbpedia_el(nlq: str, ne_list: list) -> list:
     seen = set()
     nel_list = []
 
-    for text in [nlq] + ne_list:
-        falcon_result = falcon_external(text=text)
+    texts = [nlq] + ne_list
+    with ThreadPoolExecutor() as executor:
+        falcon_results = list(executor.map(falcon_external, texts))
+
+    for falcon_result in falcon_results:
         for item in falcon_result.get("entities_dbpedia", []) + falcon_result.get("relations_dbpedia", []):
             uri = list(item.values())[0] if item else None
             if uri and uri not in seen:

@@ -24,8 +24,9 @@ def _translate_with_llm(text: str, llm) -> str:
 
     try:
         user_prompt = (
-            "If the question is already in English, simply return it unchanged. "
+            "If the question is already in English, return it unchanged. "
             "If it is not in English, translate it into English. "
+            "Do not add, remove, or rephrase any content. "
             "Only output the English sentence without any additional explanation.\n\n"
             f"Question:\n{text}"
         )

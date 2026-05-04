@@ -22,7 +22,6 @@ from services.llm_utils import (
     get_expected_answer_type,
     Plan,
     make_entity_linking_tool,
-    make_execute_sparql_tool,
     make_generate_context_tool,
 )
 from services.ld_utils import execute, post_process
@@ -143,9 +142,9 @@ class LLMAgentDBpedia:
         generate_context_tool = make_generate_context_tool(
             self.context_llm, self.entities_llm, self.shapes_llm, self.agent_prompt
         )
-        execute_sparql_tool = make_execute_sparql_tool(self.sparql_endpoint)
+        self._context_cache = generate_context_tool._cache
 
-        self.tools = [generate_context_tool, execute_sparql_tool, dbpedia_categories_tool] + self._base_tools
+        self.tools = [generate_context_tool, dbpedia_categories_tool] + self._base_tools
 
         self.agent_runnable = create_tool_calling_agent(self.llm_execution_original, self.tools, self.agent_prompt)
         self.agent_executor = AgentExecutor(
@@ -156,7 +155,11 @@ class LLMAgentDBpedia:
         self.current_model = model_name
 
     def _translate_step(self, nlq: str):
-        translated_question = translate_question(nlq, self.translation_llm)
+        try:
+            translated_question = translate_question(nlq, self.translation_llm)
+        except Exception as e:
+            logging.warning(f"Translation failed, using original question: {e}")
+            translated_question = nlq
         log_message(step_name="Translated question", color="Yellow", messages=[translated_question])
         return translated_question
 
@@ -180,6 +183,7 @@ class LLMAgentDBpedia:
             plan = self.plan_llm.invoke(
                 planner_prompt_dct[self.lang].format(objective=state["input"])
             )
+            return {"plan": [["Call generate_context_tool to gather entity URIs and the DBpedia shape. Do NOT write a SPARQL query yet — only return the context.", "Using the entity URIs and DBpedia shape from the previous step, construct and output the SPARQL query.", last_task[self.lang]]]}
             return {"plan": plan.steps + [last_task[self.lang]]}
         except Exception as e:
             log_message(step_name="Plan step failed", color="Red", messages=[str(e)])
@@ -200,6 +204,18 @@ class LLMAgentDBpedia:
             output = str(e)
             agent_response = {"output": output, "intermediate_steps": []}
 
+        intermediate = agent_response.get("intermediate_steps", [])
+        logging.info(f"[DEBUG] intermediate_steps len={len(intermediate)}")
+        context_added = False
+        for idx, step in enumerate(intermediate):
+            act, obs = step[0], step[1]
+            logging.info(f"[DEBUG] step[{idx}]: type={type(act).__name__}, tool={getattr(act, 'tool', 'NONE')}")
+            if hasattr(act, "tool") and act.tool == "generate_context_tool":
+                if not obs.startswith("Context generation failed:"):
+                    state["chat_history"].append(AIMessage(obs))
+                    context_added = True
+        logging.info(f"[DEBUG] Context passed to chat_history: {context_added}")
+
         state["chat_history"].append(AIMessage(output))
         log_message(step_name="Agent response", color="Yellow", messages=[output])
 
@@ -212,6 +228,7 @@ class LLMAgentDBpedia:
     def _feedback_step(self, state: PlanExecute):
         current_query = state["chat_history"][-1].content
         feedback_has_results = False
+        feedback_is_timeout = False
         try:
             feedback = execute(query=current_query, endpoint_url=self.sparql_endpoint)
             if isinstance(feedback, dict) and "error" not in feedback:
@@ -219,8 +236,13 @@ class LLMAgentDBpedia:
                 if bindings:
                     feedback_has_results = True
                 feedback = json.dumps(bindings)
+            elif isinstance(feedback, dict) and "timed out" in str(feedback.get("error", "")).lower():
+                feedback_is_timeout = True
+                feedback = json.dumps(feedback)
         except Exception as e:
             feedback = str(e)
+            if "timed out" in str(e).lower():
+                feedback_is_timeout = True
 
         log_message(step_name="Feedback", color="Yellow", messages=[str(feedback)])
 
@@ -234,6 +256,7 @@ class LLMAgentDBpedia:
             "feedback_task": feedback_task,
             "gave_feedback": True,
             "feedback_has_results": feedback_has_results,
+            "feedback_is_timeout": feedback_is_timeout,
         }
 
     def _feedback_router(self, state: PlanExecute):
@@ -241,6 +264,8 @@ class LLMAgentDBpedia:
             return "agent"
         if not state["gave_feedback"]:
             return "feedback"
+        if state.get("feedback_is_timeout", False):
+            return END
         return END
 
     def _init_workflow(self):
@@ -296,6 +321,7 @@ class LLMAgentDBpedia:
                 self._init_workflow()
 
             self.log_handler.reset(input_question, enabled=log_calls)
+            self._context_cache.clear()
             chat_history = [SystemMessage(content=system_prompt[self.lang])]
 
             with get_openai_callback() as cb:
@@ -313,6 +339,7 @@ class LLMAgentDBpedia:
                         "intermediate_steps": [],
                         "feedback_task": "",
                         "feedback_has_results": False,
+                        "feedback_is_timeout": False,
                     },
                     config={"callbacks": [self.log_handler]}
                 )

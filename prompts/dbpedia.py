@@ -5,20 +5,20 @@ system_prompt = {
 
 
 planner_prompt_dct = {
-    "en": """For the given objective, create a concise step-by-step plan to write a SPARQL query over DBpedia.
-Available tools: generate_context_tool, execute_sparql_tool, dbpedia_categories_tool.
+    "en": """For the given objective, create a step-by-step plan to write a SPARQL query over DBpedia.
+Available tools: generate_context_tool, dbpedia_categories_tool.
 
-Keep the plan SHORT — exactly 2 steps for most questions:
-  Step 1: "Call generate_context_tool to get entity URIs and the DBpedia shape for the question."
-  Step 2: "Construct the SPARQL query using the entity URIs and shape from step 1."
+Always output exactly 2 steps:
+  Step 1: "Call generate_context_tool to gather entity URIs and the DBpedia shape. Do NOT write a SPARQL query yet — only return the context."
+  Step 2: "Using the entity URIs and DBpedia shape from the previous step, construct and output the SPARQL query."
 
-Only add a Step 3 if the question needs a Wikipedia category lookup (dbpedia_categories_tool) or involves multiple unrelated entity groups.
+Only replace Step 1 with a dbpedia_categories_tool call if the question involves Wikipedia category membership.
 
 Rules:
-- Do NOT split entity extraction, linking, and shape generation into separate steps — generate_context_tool handles all three internally.
+- generate_context_tool handles entity extraction, linking, and shape generation internally — call it once in Step 1.
 - Do NOT resolve or link entities yourself — tools do that.
 - Do NOT propose executing the query — a separate feedback step handles that automatically.
-- The final step MUST output exactly ONE SPARQL query string with no extra text or markdown.
+- Step 2 MUST output exactly ONE SPARQL query string with no extra text or markdown.
 
 Objective: {objective}
 
@@ -39,11 +39,16 @@ Determine whether to output a URI (SELECT ?uri), number (COUNT), date, boolean (
 - If the question is a yes/no question ("Are there any...", "Does X...", "Is there..."), use ASK WHERE { ... } instead of SELECT.
 - If the expected answer is a date (e.g. founding year, birth date), cast to xsd:date using: BIND(xsd:date(STR(?raw)) AS ?date)
 - If the question asks for a single list of things (people, places, etc.), use a single ?uri SELECT column. When two related entities (e.g. both parents, both father and mother) are the answer, merge them into one column with UNION rather than using multiple SELECT variables:
-  CORRECT:   SELECT ?uri WHERE { { res:X dbo:parent ?uri } }
-  INCORRECT: SELECT ?father ?mother WHERE { res:X dbo:father ?father ; dbo:mother ?mother }
+    CORRECT:   SELECT ?uri WHERE { { res:X dbo:parent ?uri } }
+    INCORRECT: SELECT ?father ?mother WHERE { res:X dbo:father ?father ; dbo:mother ?mother }
+- If the shape contained a property with controlled string values (e.g. [values: "X", "Y", ...]), use that as a direct mandatory filter — do NOT substitute YAGO or external class URIs.
+    Example: ?uri a dbo:Film ; dbo:country res:Denmark  (NOT ?uri a yago:WikicatDanishFilms)
+- If the query contains UNION patterns, make sure it is correctly formatted
+    CORRECT:   SELECT ?uri WHERE { { ?s dbo:a ?uri } UNION { ?s dbo:b ?uri } }
+    INCORRECT: SELECT ?uri WHERE { ?s dbo:a ?uri } UNION { ?s dbo:b ?uri }
+    INCORRECT: SELECT ?uri WHERE { ?s dbo:a ?uri . UNION { ?s dbo:b ?uri } }
+
 DON'T USE "SERVICE wikibase:label"
-If the shape contained a property with controlled string values (e.g. [values: "X", "Y", ...]), use that as a direct mandatory filter — do NOT substitute YAGO or external class URIs.
-Example: ?uri a dbo:Film ; dbo:country res:Denmark  (NOT ?uri a yago:WikicatDanishFilms)
 """
 }
 
@@ -76,7 +81,7 @@ feedback_step_dict = {
     - Add UNION patterns for alternative access paths: location (dbo:location / dbo:city / dbo:city+dbo:isPartOf), birthplace (dbo:birthPlace direct / via dbo:country), country (dbo:country / dbp:country)
     - If structured properties fail entirely, try: ?uri dct:subject dbc:RelevantCategoryName
     - For nickname/alias questions, try foaf:nick instead of dbp:nickname: res:X foaf:nick ?name
-    - If the expected answer is a string literal (not a URI), try the dbp: property directly — e.g. dbp:deathCause returns a string, dbp:satellites returns an integer, dbp:crewMembers returns names
+    - If the expected answer is a string literal (not a URI), try the dbp: property directly
     Review the shape generated earlier in the conversation and write a corrected query.
     If a property lists controlled values (e.g. [values: "X", "Y", ...]), use the appropriate value as a MANDATORY filter — do NOT make it OPTIONAL and do NOT replace it with a YAGO class.
     Example: ?uri a dbo:City ; dbo:isPartOf res:New_Jersey  (NOT ?uri a yago:WikicatCitiesInNewJersey)
@@ -85,6 +90,22 @@ feedback_step_dict = {
     """
   }
 
+feedback_step_dict_short = {
+    "en": """
+    This is feedback to your generated SPARQL query produced by executing it on a triplestore.
+    Please rework your query if neccessary.
+
+    Initial question: {question}
+    Your query: 
+    {query}
+
+    --- Start triplestore response ---
+    {feedback}
+    --- End triplestore response ---
+
+    {last_task}
+    """
+  }
 
 shape_selection_prompt = {
     "en": """Given the folowing question: "{nlq}", and the following shape: "{shape}"
