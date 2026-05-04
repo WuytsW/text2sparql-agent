@@ -1,6 +1,7 @@
 import os
 import re as _re
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from shexer.shaper import Shaper
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
@@ -326,44 +327,44 @@ _NAMESPACES_DICT = {
 }
 
 
+def _process_label(label: str, nlq: str, shapes_llm, endpoint: str):
+    label_clean = label.replace(" ", "_")
+    label_clean = label_clean[0].upper() + label_clean[1:]
+
+    if _llm_classify(label_clean, shapes_llm):
+        class_uri = f"http://dbpedia.org/ontology/{label_clean}"
+        props = get_tbox_properties(class_uri, endpoint)
+        items = _tbox_to_prop_range_items(props)
+        # Also fetch raw Wikipedia infobox (dbp:) properties from A-box sample instances.
+        # These are absent from the T-Box but often hold the actual data values.
+        dbp_props = get_abox_dbp_properties(class_uri, endpoint)
+        dbp_items = _tbox_to_prop_range_items(dbp_props)
+        # Merge, avoiding duplicates (dbo: items take precedence).
+        existing_props = {item.split(" ->")[0].strip() for item in items}
+        for dbp_item in dbp_items:
+            dbp_key = dbp_item.split(" ->")[0].strip()
+            if dbp_key not in existing_props:
+                items.append(dbp_item)
+                existing_props.add(dbp_key)
+    else:
+        shex_str = _run_shexer_for_entity(label_clean, endpoint, _NAMESPACES_DICT)
+        items = _parse_shex_to_prop_range_items(shex_str)
+
+    return _process_entity_section(label_clean, items, nlq, shapes_llm, endpoint)
+
+
 def generate_shape(nlq: str, entity_labels: list, shapes_llm):
     load_dotenv(dotenv_path=".env")
     endpoint = os.getenv("DBPEDIA_SPARQL_URL")
     #logging.info(f"[generate_shape] Entity labels: {entity_labels}")
 
-    sections = []
     try:
-        for label in entity_labels:
-            label_clean = label.replace(" ", "_")
-            label_clean = label_clean[0].upper() + label_clean[1:]
-            #logging.info(f"[generate_shape] Processing '{label_clean}'")
-
-            if _llm_classify(label_clean, shapes_llm):
-                #logging.info(f"[generate_shape] '{label_clean}' -> CLASS (T-Box path)")
-                class_uri = f"http://dbpedia.org/ontology/{label_clean}"
-                props = get_tbox_properties(class_uri, endpoint)
-                items = _tbox_to_prop_range_items(props)
-                # Also fetch raw Wikipedia infobox (dbp:) properties from A-box sample instances.
-                # These are absent from the T-Box but often hold the actual data values.
-                dbp_props = get_abox_dbp_properties(class_uri, endpoint)
-                dbp_items = _tbox_to_prop_range_items(dbp_props)
-                # Merge, avoiding duplicates (dbo: items take precedence).
-                existing_props = {item.split(" ->")[0].strip() for item in items}
-                for dbp_item in dbp_items:
-                    dbp_key = dbp_item.split(" ->")[0].strip()
-                    if dbp_key not in existing_props:
-                        items.append(dbp_item)
-                        existing_props.add(dbp_key)
-            else:
-                #logging.info(f"[generate_shape] '{label_clean}' -> ENTITY (shexer path)")
-                shex_str = _run_shexer_for_entity(label_clean, endpoint, _NAMESPACES_DICT)
-                items = _parse_shex_to_prop_range_items(shex_str)
-
-            section = _process_entity_section(
-                label_clean, items, nlq, shapes_llm, endpoint
-            )
-            if section:
-                sections.append(section)
+        with ThreadPoolExecutor() as executor:
+            results = list(executor.map(
+                lambda label: _process_label(label, nlq, shapes_llm, endpoint),
+                entity_labels
+            ))
+        sections = [s for s in results if s]
 
     except Exception as e:
         #logging.error(f"[generate_shape] Failed: {e}", exc_info=True)

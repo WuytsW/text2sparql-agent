@@ -12,3 +12,4 @@ class PlanExecute(TypedDict):
     feedback_task: str
     gave_feedback: bool
     feedback_has_results: bool
+    feedback_is_timeout: bool
