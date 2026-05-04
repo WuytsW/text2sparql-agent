@@ -179,6 +179,30 @@ Result: "Nikola Tesla" NOT "Person"
 """
 }
 
+shape_check_prompt = {
+    "en": """You are evaluating whether a DBpedia knowledge graph shape is useful for answering a question.
+
+Question: "{nlq}"
+
+Shape:
+{shape}
+
+A shape is USEFUL if:
+- It is non-empty (has at least one property line)
+- At least one property is plausibly relevant to answering the question
+- The entity labels correspond to real DBpedia resources or classes (not empty placeholders)
+
+A shape is NOT USEFUL if:
+- It is empty or contains no property lines
+- None of the extracted properties relate to what the question is asking
+- The entity labels are clearly wrong or too generic for the question
+
+Respond with ONLY a JSON object in this exact format (no markdown, no explanation outside the JSON):
+{{"valid": true, "reason": "brief explanation of why the shape is useful"}}
+or
+{{"valid": false, "reason": "what is wrong and what entity labels might work better"}}"""
+}
+
 entities_extraction_prompt = {
 "en": """Extract the DBpedia entity and class labels needed to answer the following question with a SPARQL query.
 

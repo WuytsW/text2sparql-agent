@@ -61,10 +61,20 @@ def _expand_prefixed(prefixed: str):
     return None
 
 
+def _normalize_range(r: str) -> str:
+    """Normalize a range string to a consistent prefixed form."""
+    r = r.strip().strip("@[]")
+    if not r:
+        return "IRI"
+    if r.startswith("<") and r.endswith(">"):
+        return _shorten_uri(r[1:-1])
+    return r
+
+
 def _tbox_to_prop_range_items(properties: list) -> list:
     """Convert get_tbox_properties() dicts into plain prop -> range strings."""
     return [
-        f"{_shorten_uri(p['prop'])} -> {_shorten_uri(p['range']) if p.get('range') else 'IRI'}"
+        f"{_shorten_uri(p['prop'])} -> {_normalize_range(p.get('range', ''))}"
         for p in properties
     ]
 
@@ -84,7 +94,7 @@ def _parse_shex_to_prop_range_items(shex_string: str) -> list:
         if not m:
             continue
         prop = m.group(1)
-        range_ = m.group(2).strip("@[]")
+        range_ = _normalize_range(m.group(2))
         if prop in _SKIP_PROPS:
             continue
         items.append(f"{prop} -> {range_}")
@@ -216,7 +226,7 @@ def add_possible_values_to_shape(relevant_items: list, sparql_endpoint: str) -> 
         if not m:
             result_lines.append(item)
             continue
-        prop, range_ = m.group(1), m.group(2)
+        prop, range_ = m.group(1), _normalize_range(m.group(2))
         values = _query_property_values(prop, sparql_endpoint)
         if values:
             vals_str = ", ".join(values)
