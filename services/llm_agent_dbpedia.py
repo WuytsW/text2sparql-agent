@@ -8,7 +8,7 @@ from langchain_community.callbacks import get_openai_callback
 from langgraph.graph import StateGraph, END
 from dotenv import load_dotenv
 from services.log_utils.LogLLMCallbackHandler import LogLLMCallbackHandler
-from services.log_utils.log import log_message
+from services.log_utils.log import log_message, set_question_log
 from services.translate import translate_question
 
 from typing import List
@@ -20,6 +20,7 @@ import logging
 from services.llm_utils import (
     dbpedia_categories_tool,
     get_expected_answer_type,
+    correct_query_prefixes,
 )
 from services.context_graph import make_context_graph
 from services.ld_utils import execute, post_process
@@ -316,6 +317,7 @@ class LLMAgentDBpedia:
                 self._init_workflow()
 
             self.log_handler.reset(input_question, enabled=log_calls)
+            set_question_log(input_question)
 
             chat_history = [SystemMessage(content=system_prompt[self.lang])]
 
@@ -341,6 +343,7 @@ class LLMAgentDBpedia:
 
             sparql_result = result["chat_history"][-1].content
             generated_query = post_process(sparql_result)
+            generated_query = correct_query_prefixes(generated_query, self.shape_check_llm)
             log_message(step_name="Generated SPARQL query", color="Green", messages=[generated_query])
             self.log_handler._flush_to_file(generated_query)
 

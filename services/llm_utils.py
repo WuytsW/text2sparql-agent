@@ -235,6 +235,23 @@ def make_shape_check_tool(llm):
     return shape_check_tool
 
 
+_PREFIX_CORRECTIONS = {
+    "dbp:homepage":  "foaf:homepage",
+    "dbp:nick":      "foaf:nick",
+    "dbp:name":      "foaf:name",
+    "dbp:depiction": "foaf:depiction",
+    "dbp:mbox":      "foaf:mbox",
+    "dbp:abstract":  "dbo:abstract",
+    "dbp:thumbnail": "dbo:thumbnail",
+}
+
+def correct_query_prefixes(query: str, llm=None) -> str:
+    """Correct dbp: properties to semantic equivalents (foaf:, dbo:) using a fixed rule table."""
+    for src, dst in _PREFIX_CORRECTIONS.items():
+        query = query.replace(src, dst)
+    return query
+
+
 def get_corporate_entities(query: str, is_relation: bool) -> list:
     """
     Make a GET request to the Corporate entity service and return the parsed response

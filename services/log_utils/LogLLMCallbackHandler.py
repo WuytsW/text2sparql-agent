@@ -1,20 +1,9 @@
-import logging
 from datetime import datetime
 from langchain_core.callbacks import BaseCallbackHandler
+from services.log_utils.log import log_message
 import os
 import json
 
-
-BLACK   = "\033[30m"
-RED     = "\033[31m"
-GREEN   = "\033[32m"
-YELLOW  = "\033[33m"
-BLUE    = "\033[34m"
-MAGENTA = "\033[35m"
-CYAN    = "\033[36m"
-WHITE   = "\033[37m"
-
-RESET   = "\033[0m"
 
 class LogLLMCallbackHandler(BaseCallbackHandler):
     def __init__(self):
@@ -28,28 +17,6 @@ class LogLLMCallbackHandler(BaseCallbackHandler):
         self._question = question
         self._start_time = datetime.now().isoformat()
         self._enabled = enabled
-
-    def _flush_to_file(self, sparql: str, log_path: str = "logs/llm_calls.json"):
-        if not self._enabled:
-            return
-        record = {
-            "time": self._start_time,
-            "question": self._question,
-            "total_llm_calls": self.call_count,
-            "sparql": sparql,
-            "calls": self._log_entries,
-        }
-        os.makedirs(os.path.dirname(log_path), exist_ok=True)
-        existing = []
-        if os.path.exists(log_path):
-            with open(log_path, "r", encoding="utf-8") as f:
-                try:
-                    existing = json.load(f)
-                except json.JSONDecodeError:
-                    existing = []
-        existing.append(record)
-        with open(log_path, "w", encoding="utf-8") as f:
-            json.dump(existing, f, indent=2, ensure_ascii=False)
 
     def _format_messages(self, msgs):
         lines = []
@@ -69,7 +36,11 @@ class LogLLMCallbackHandler(BaseCallbackHandler):
         msgs = [[{"type": m.type, "content": m.content} for m in grp] for grp in _messages]
         self._log_entries.append({"call": self.call_count, "model": model, "messages": msgs})
         formatted = self._format_messages(msgs)
-        logging.info(f"{BLUE}[LLM API call #{self.call_count}] model={model}\n{formatted}{RESET}")
+        log_message(
+            step_name=f"LLM API call #{self.call_count} model={model}",
+            color="Blue",
+            messages=formatted.splitlines(),
+        )
 
     def on_llm_end(self, response, **kwargs):
         if not self._enabled:
@@ -79,4 +50,8 @@ class LogLLMCallbackHandler(BaseCallbackHandler):
         if text:
             if self._log_entries:
                 self._log_entries[-1]["response"] = text
-            logging.info(f"{MAGENTA}[LLM response #{self.call_count}]:\n{text}{RESET}")
+            log_message(
+                step_name=f"LLM response #{self.call_count}",
+                color="Magenta",
+                messages=text.splitlines(),
+            )
