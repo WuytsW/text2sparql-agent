@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from datetime import datetime
 
 BLACK   = "\033[30m"
@@ -18,20 +19,38 @@ COLOR_MAP = {
     "Blue": BLUE, "Magenta": MAGENTA, "Cyan": CYAN, "White": WHITE,
 }
 
-_LOG_FILE = os.path.join(os.path.dirname(__file__), "..", "..", "logs", "messages.log")
+_THESIS_LOG_DIR = r"G:\Thesis\logs"
+_question_log_file: str | None = None
+_ANSI_RE = re.compile(r"\033\[[0-9;]*m")
 
-def _append_to_log(text: str):
-    os.makedirs(os.path.dirname(_LOG_FILE), exist_ok=True)
-    with open(_LOG_FILE, "a", encoding="utf-8") as f:
-        f.write(text + "\n")
+
+def _strip_ansi(text: str) -> str:
+    return _ANSI_RE.sub("", text)
+
+
+def set_question_log(question: str):
+    global _question_log_file
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    safe_question = re.sub(r'[\\/:*"<>|]', "_", question)[:80]
+    safe_question = re.sub(r'[?]', "", safe_question)[:80]
+    filename = f"[{timestamp}]_{safe_question}.txt"
+    os.makedirs(_THESIS_LOG_DIR, exist_ok=True)
+    _question_log_file = os.path.join(_THESIS_LOG_DIR, filename)
+
+
+def _append_to_question_log(text: str):
+    if _question_log_file:
+        with open(_question_log_file, "a", encoding="utf-8") as f:
+            f.write(_strip_ansi(text) + "\n")
+
 
 def log_message(step_name: str, color: str = "White", messages: list = None):
     colorCode = COLOR_MAP.get(color, WHITE)
     header = f"{colorCode}[{datetime.now().strftime('%H:%M:%S')}][{step_name}]{RESET}"
     logging.info(header)
-    _append_to_log(header)
+    _append_to_question_log(header)
     if messages:
         for message in messages:
             line = f"{colorCode}{message}{RESET}"
             print(line)
-            _append_to_log(line)
+            _append_to_question_log(line)

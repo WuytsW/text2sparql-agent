@@ -36,7 +36,7 @@ Task: Construct the SPARQL query using the pre-computed entity URIs and DBpedia 
 last_task = {
     "en": """Make sure that the query is formatted correctly. No extra text. No markdown. Just plain SPARQL query.
 Determine whether to output a URI (SELECT ?uri), number (COUNT), date, boolean (ASK), string (SELECT ?label).
-- If the question is a yes/no question ("Are there any...", "Does X...", "Is there..."), use ASK WHERE { ... } instead of SELECT.
+- If the question is a yes/no question ("Are there any...", "Does X...", "Is there...", "Is X the Y of Z?"), use ASK WHERE { ... } instead of SELECT. Questions starting with "Who", "Which", "What", "Give me", "How many" always expect SELECT, never ASK.
 - If the expected answer is a date (e.g. founding year, birth date), cast to xsd:date using: BIND(xsd:date(STR(?raw)) AS ?date)
 - If the question asks for a single list of things (people, places, etc.), use a single ?uri SELECT column. When two related entities (e.g. both parents, both father and mother) are the answer, merge them into one column with UNION rather than using multiple SELECT variables:
     CORRECT:   SELECT ?uri WHERE { { res:X dbo:parent ?uri } }
@@ -76,11 +76,10 @@ feedback_step_dict = {
     - Remove overly restrictive type constraints that may not exist in the triplestore
     - Use dbo: properties from the shape instead of guessing property paths
     - Check whether the shape uses a different predicate than the one in your query
-    - Try dbp: prefix instead of dbo: for the main property — many facts only exist in raw Wikipedia infobox properties (e.g. dbp:date, dbp:established, dbp:satellites, dbp:crewMembers)
+    - Try dbp: prefix instead of dbo: ONLY if the shape explicitly listed that property with a dbp: prefix — many facts only exist in raw Wikipedia infobox properties (e.g. dbp:satellites, dbp:crewMembers). Do NOT blindly switch all dbo: properties to dbp:.
     - Try reversing the subject and object of the main triple — some properties (e.g. dbo:goldMedalist, dbo:museum, dbo:commander, dbo:spokenIn) have the named entity as the object, not the subject
     - Add UNION patterns for alternative access paths: location (dbo:location / dbo:city / dbo:city+dbo:isPartOf), birthplace (dbo:birthPlace direct / via dbo:country), country (dbo:country / dbp:country)
     - If structured properties fail entirely, try: ?uri dct:subject dbc:RelevantCategoryName
-    - For nickname/alias questions, try foaf:nick instead of dbp:nickname: res:X foaf:nick ?name
     - If the expected answer is a string literal (not a URI), try the dbp: property directly
     Review the shape generated earlier in the conversation and write a corrected query.
     If a property lists controlled values (e.g. [values: "X", "Y", ...]), use the appropriate value as a MANDATORY filter — do NOT make it OPTIONAL and do NOT replace it with a YAGO class.
@@ -235,4 +234,24 @@ Result: Nikola Tesla
 Example: "Show me all museums in London."
 Result: Museum, London
 """
+}
+
+query_correction_prompt = {
+    "en": """You are a SPARQL expert. Review the query below and replace any `dbp:` properties that have well-known semantic equivalents in `foaf:`, `dbo:`, or `schema:`.
+
+Only replace properties from this list:
+- dbp:homepage → foaf:homepage
+- dbp:nick → foaf:nick
+- dbp:name → foaf:name
+- dbp:depiction → foaf:depiction
+- dbp:mbox → foaf:mbox
+- dbp:abstract → dbo:abstract
+- dbp:thumbnail → dbo:thumbnail
+
+Do NOT change any other properties. Do NOT change resource URIs or PREFIX declarations.
+
+Query:
+{query}
+
+Return ONLY the (possibly corrected) SPARQL query. No explanation. No code fences."""
 }
