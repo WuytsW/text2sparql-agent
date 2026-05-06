@@ -16,6 +16,7 @@ from typing import List
 import os
 import json
 import logging
+import time
 
 from services.llm_utils import (
     dbpedia_categories_tool,
@@ -83,6 +84,8 @@ class LLMAgentDBpedia:
 
         self.log_handler = LogLLMCallbackHandler()
         self._init_llms(model_name)
+        self._step_times: list = []
+        self._agent_call_count: int = 0
         ### END Initialize agent
 
     def _init_llms(self, model_name: str):
@@ -169,9 +172,13 @@ class LLMAgentDBpedia:
             log_message(step_name="Expected answer type failed", color="Red", messages=[str(e)])
 
     def _plan_step(self, state: PlanExecute):
-        return {"plan": ["generate SPARQL query with the context provided in the chat history", last_task[self.lang]]}
+        _t0 = time.perf_counter()
+        result = {"plan": ["generate SPARQL query with the context provided in the chat history", last_task[self.lang]]}
+        self._step_times.append(f"planner: {time.perf_counter() - _t0:.2f}s")
+        return result
 
     def _context_step(self, state: PlanExecute):
+        _t0 = time.perf_counter()
         result = self._context_graph.invoke({
             "nlq": state["input"],
             "retry_count": 0,
@@ -193,9 +200,12 @@ class LLMAgentDBpedia:
             f"Shape:\n{accepted_shape}"
         )
         log_message(step_name="Context generated", color="Cyan", messages=[context_msg])
+        self._step_times.append(f"context: {time.perf_counter() - _t0:.2f}s")
         return {"chat_history": state["chat_history"] + [AIMessage(content=context_msg)]}
 
     def _agent_step(self, state: PlanExecute):
+        self._agent_call_count += 1
+        _t0 = time.perf_counter()
         task = state["feedback_task"] if state["gave_feedback"] else state["plan"].pop(0)
         log_message(step_name="Agent task", color="Cyan", messages=[str(task)])
 
@@ -212,6 +222,7 @@ class LLMAgentDBpedia:
 
         state["chat_history"].append(AIMessage(output))
         log_message(step_name="Agent response", color="Yellow", messages=[output])
+        self._step_times.append(f"agent_{self._agent_call_count}: {time.perf_counter() - _t0:.2f}s")
 
         return {
             "past_steps": [task, output],
@@ -220,6 +231,7 @@ class LLMAgentDBpedia:
         }
 
     def _feedback_step(self, state: PlanExecute):
+        _t0 = time.perf_counter()
         current_query = state["chat_history"][-1].content
         feedback_has_results = False
         feedback_is_timeout = False
@@ -246,6 +258,7 @@ class LLMAgentDBpedia:
             feedback=feedback,
             last_task=last_task[self.lang]
         ))
+        self._step_times.append(f"feedback: {time.perf_counter() - _t0:.2f}s")
         return {
             "feedback_task": feedback_task,
             "gave_feedback": True,
@@ -316,15 +329,25 @@ class LLMAgentDBpedia:
             if self.app is None:
                 self._init_workflow()
 
+            self._step_times = []
+            self._agent_call_count = 0
             self.log_handler.reset(input_question, enabled=log_calls)
             set_question_log(input_question)
-
+            log_message(step_name="Original question", color="Yellow", messages=[input_question])
             chat_history = [SystemMessage(content=system_prompt[self.lang])]
 
             with get_openai_callback() as cb:
+                _t0 = time.perf_counter()
                 translated_question = self._translate_step(input_question)
+                self._step_times.append(f"translation: {time.perf_counter() - _t0:.2f}s")
+
+                _t0 = time.perf_counter()
                 self._eat_step(chat_history, translated_question)
+                self._step_times.append(f"eat: {time.perf_counter() - _t0:.2f}s")
+
+                _t0 = time.perf_counter()
                 self._get_similar_examples_step(chat_history, translated_question)
+                self._step_times.append(f"icl: {time.perf_counter() - _t0:.2f}s")
 
                 result = self.app.invoke(
                     {
@@ -345,7 +368,6 @@ class LLMAgentDBpedia:
             generated_query = post_process(sparql_result)
             generated_query = correct_query_prefixes(generated_query, self.shape_check_llm)
             log_message(step_name="Generated SPARQL query", color="Green", messages=[generated_query])
-            self.log_handler._flush_to_file(generated_query)
 
             return {
                 "translated_question": translated_question,
@@ -353,16 +375,18 @@ class LLMAgentDBpedia:
                 "prompt_tokens": cb.prompt_tokens,
                 "completion_tokens": cb.completion_tokens,
                 "requests": cb.successful_requests,
+                "step_times": self._step_times,
             }
 
         except Exception as e:
             logging.error(f"Error in generate_sparql: {e}")
             return {
                 "translated_question": input_question,
-                "query": "SELECT ?s ?p ?o WHERE { ?s ?p ?o } LIMIT 10",
+                "query": "SELECT ?s ?p ?o WHERE { ?s ?p ?o } LIMIT 1",
                 "prompt_tokens": 0,
                 "completion_tokens": 0,
                 "requests": 0,
+                "step_times": self._step_times,
             }
 
 
