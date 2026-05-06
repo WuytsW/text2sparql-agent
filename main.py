@@ -60,6 +60,7 @@ async def get_answer(
         "prompt_tokens": result["prompt_tokens"],
         "completion_tokens": result["completion_tokens"],
         "requests": result["requests"],
+        "step_times": result.get("step_times", []),
     }
 
 if __name__ == "__main__":

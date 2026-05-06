@@ -102,7 +102,7 @@ def make_context_graph(entities_llm, shapes_llm, check_llm):
             "failed_attempts": new_failed,
             "retry_count": new_retry_count,
         }
-        if new_retry_count >= 1:
+        if new_retry_count >= 3:
             log_message(
                 step_name="[context] Max retries reached — accepting last shape",
                 color="Yellow",
