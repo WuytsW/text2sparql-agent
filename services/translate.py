@@ -23,7 +23,7 @@ def _translate_with_llm(text: str, llm) -> str:
 
 
     try:
-        user_prompt_old = (
+        user_prompt = (
             "If the question is already in English, return it unchanged. "
             "If it is not in English, translate it into English. "
             "Do not add, remove, or rephrase any content. "
@@ -31,7 +31,7 @@ def _translate_with_llm(text: str, llm) -> str:
             f"Question:\n{text}"
         )
 
-        user_prompt = (
+        user_prompt_new = (
             "Rewrite the following question to make the meaning clearer and more concise. "
             "Maintain the original meaning and intent of the question! "
             "If it is not in English, translate it into English. "

@@ -178,7 +178,6 @@ class LLMAgentDBpedia:
         return result
 
     def _context_step(self, state: PlanExecute):
-        _t0 = time.perf_counter()
         result = self._context_graph.invoke({
             "nlq": state["input"],
             "retry_count": 0,
@@ -190,6 +189,7 @@ class LLMAgentDBpedia:
             "check_reason": "",
             "accepted_shape": None,
             "accepted_entity_uris": None,
+            "step_times": {"extraction": [], "el": [], "shape": [], "check": []},
         })
 
         accepted_shape = result.get("accepted_shape") or result.get("shape") or "No shape generated."
@@ -200,7 +200,7 @@ class LLMAgentDBpedia:
             f"Shape:\n{accepted_shape}"
         )
         log_message(step_name="Context generated", color="Cyan", messages=[context_msg])
-        self._step_times.append(f"context: {time.perf_counter() - _t0:.2f}s")
+        self._step_times.append({"context": result.get("step_times", {})})
         return {"chat_history": state["chat_history"] + [AIMessage(content=context_msg)]}
 
     def _agent_step(self, state: PlanExecute):
