@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 from typing import List, Optional, TypedDict
 
 from langgraph.graph import StateGraph, END
@@ -18,6 +19,7 @@ class ContextState(TypedDict):
     check_reason: str
     accepted_shape: Optional[str]
     accepted_entity_uris: Optional[List[dict]]
+    step_times: dict
 
 
 def make_context_graph(entities_llm, shapes_llm, check_llm):
@@ -36,6 +38,7 @@ def make_context_graph(entities_llm, shapes_llm, check_llm):
     _shape_check = make_shape_check_tool(check_llm)
 
     def extract_node(state: ContextState) -> dict:
+        _t0 = time.perf_counter()
         try:
             entities = extract_entities(
                 state["nlq"], entities_llm, state["failed_attempts"] or []
@@ -44,27 +47,36 @@ def make_context_graph(entities_llm, shapes_llm, check_llm):
             logging.warning(f"[context_graph] extract_entities failed: {e}")
             entities = []
         log_message(step_name="[context] Extracted entities", color="Cyan", messages=[str(entities)])
-        return {"entities": entities}
+        st = state["step_times"]
+        st["extraction"].append(f"{time.perf_counter() - _t0:.2f}s")
+        return {"entities": entities, "step_times": st}
 
     def el_node(state: ContextState) -> dict:
+        _t0 = time.perf_counter()
         try:
             entity_uris = dbpedia_el(state["nlq"], state["entities"])
         except Exception as e:
             logging.warning(f"[context_graph] entity_linking failed: {e}")
             entity_uris = []
         log_message(step_name="[context] Entity URIs", color="Cyan", messages=[str(entity_uris)])
-        return {"entity_uris": entity_uris}
+        st = state["step_times"]
+        st["el"].append(f"{time.perf_counter() - _t0:.2f}s")
+        return {"entity_uris": entity_uris, "step_times": st}
 
     def shape_node(state: ContextState) -> dict:
+        _t0 = time.perf_counter()
         try:
             shape = generate_shape(state["nlq"], state["entities"], shapes_llm) or ""
         except Exception as e:
             logging.warning(f"[context_graph] shape_generation failed: {e}")
             shape = ""
         log_message(step_name="[context] Shape generated", color="Cyan", messages=[shape or "(empty)"])
-        return {"shape": shape}
+        st = state["step_times"]
+        st["shape"].append(f"{time.perf_counter() - _t0:.2f}s")
+        return {"shape": shape, "step_times": st}
 
     def check_node(state: ContextState) -> dict:
+        _t0 = time.perf_counter()
         try:
             result = _shape_check.invoke({"nlq": state["nlq"], "shape": state["shape"]})
             valid = result.get("valid", False)
@@ -80,12 +92,16 @@ def make_context_graph(entities_llm, shapes_llm, check_llm):
             messages=[f"valid={valid}", reason],
         )
 
+        st = state["step_times"]
+        st["check"].append(f"{time.perf_counter() - _t0:.2f}s")
+
         if valid:
             return {
                 "check_valid": True,
                 "check_reason": reason,
                 "accepted_shape": state["shape"],
                 "accepted_entity_uris": state["entity_uris"],
+                "step_times": st,
             }
 
         new_retry_count = state["retry_count"] + 1
@@ -101,6 +117,7 @@ def make_context_graph(entities_llm, shapes_llm, check_llm):
             "check_reason": reason,
             "failed_attempts": new_failed,
             "retry_count": new_retry_count,
+            "step_times": st,
         }
         if new_retry_count >= 3:
             log_message(
