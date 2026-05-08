@@ -20,6 +20,7 @@ import time
 
 from services.llm_utils import (
     dbpedia_categories_tool,
+    _fetch_dbpedia_categories,
     get_expected_answer_type,
     correct_query_prefixes,
 )
@@ -173,7 +174,16 @@ class LLMAgentDBpedia:
 
     def _plan_step(self, state: PlanExecute):
         _t0 = time.perf_counter()
-        result = {"plan": ["generate SPARQL query with the context provided in the chat history", last_task[self.lang]]}
+        result = {"plan": [
+            (
+                "generate SPARQL query with the context provided in the chat history. "
+                "If the question involves group membership (e.g. 'Who are the X of Y?', "
+                "'Which things belong to category X?', members/winners/participants of something), "
+                "call dbpedia_categories_tool first to find relevant dbc: category URIs, "
+                "then build the query as: ?uri dct:subject <category_uri>"
+            ),
+            last_task[self.lang],
+        ]}
         self._step_times.append(f"planner: {time.perf_counter() - _t0:.2f}s")
         return result
 
@@ -252,10 +262,36 @@ class LLMAgentDBpedia:
 
         log_message(step_name="Feedback", color="Yellow", messages=[str(feedback)])
 
+        category_hint = ""
+        date_hint = ""
+        if not feedback_has_results:
+            import re
+            local_names = re.findall(r'\bres:([A-Z][A-Za-z_]+)', current_query)
+            found_cats = []
+            for name in local_names[:3]:
+                found_cats.extend(_fetch_dbpedia_categories(name.replace('_', ' '))[:5])
+            class_names = re.findall(r'\ba\s+dbo:([A-Z][A-Za-z]+)', current_query)
+            for cls in class_names[:2]:
+                found_cats.extend(_fetch_dbpedia_categories(cls)[:5])
+            if found_cats:
+                cats_str = "\n".join(f"  {c['uri']}  ({c['label']})" for c in found_cats[:10])
+                category_hint = (
+                    f"\nAuto-found DBpedia categories for entities in your query:\n{cats_str}\n"
+                    "If the question is about group membership, rewrite as: ?uri dct:subject <category_uri>"
+                )
+            if re.search(r'FILTER\s*\(.*xsd:date', current_query, re.IGNORECASE | re.DOTALL):
+                date_hint = (
+                    "\nThe failed query used date-range FILTER patterns. "
+                    "Prefer a direct property from the shape that explicitly links the named entity to the answer "
+                    "(e.g. res:SomeEvent dbo:someProperty ?uri) rather than computing overlap via term dates."
+                )
+
         feedback_task = str(feedback_step_dict[self.lang].format(
             question=state["input"],
             query=current_query,
             feedback=feedback,
+            category_hint=category_hint,
+            date_hint=date_hint,
             last_task=last_task[self.lang]
         ))
         self._step_times.append(f"feedback: {time.perf_counter() - _t0:.2f}s")

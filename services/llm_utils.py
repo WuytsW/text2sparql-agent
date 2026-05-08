@@ -9,6 +9,7 @@ from typing import List
 
 from pydantic import BaseModel, Field
 from langchain.tools import tool
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from SPARQLWrapper import SPARQLWrapper, JSON as SPARQL_JSON
 from services.log_utils.log import log_message
 
@@ -96,13 +97,7 @@ class DBpediaCategoriesInput(BaseModel):
     topic: str = Field(description="A topic or entity label to search for matching DBpedia category URIs (e.g. 'James Bond films', 'Countries in Africa')")
 
 
-@tool("dbpedia_categories_tool", args_schema=DBpediaCategoriesInput)
-def dbpedia_categories_tool(topic: str) -> list:
-    """
-    Searches DBpedia for Wikipedia category URIs (dbc:) that match a given topic.
-    Use this when a question is about group membership and structured ontology triples are insufficient.
-    Returns a list of matching category URIs that can be used as: ?uri dct:subject <category_uri>
-    """
+def _fetch_dbpedia_categories(topic: str) -> list:
     dbpedia_url = os.getenv("DBPEDIA_SPARQL_URL", "https://dbpedia.org/sparql")
     search_term = topic.lower().replace(" ", "_")
     query = f"""
@@ -134,6 +129,16 @@ SELECT DISTINCT ?cat ?label WHERE {{
     except Exception as e:
         logging.warning(f"[dbpedia_categories_tool] Query failed for '{topic}': {e}")
         return []
+
+
+@tool("dbpedia_categories_tool", args_schema=DBpediaCategoriesInput)
+def dbpedia_categories_tool(topic: str) -> list:
+    """
+    Searches DBpedia for Wikipedia category URIs (dbc:) that match a given topic.
+    Use this when a question is about group membership and structured ontology triples are insufficient.
+    Returns a list of matching category URIs that can be used as: ?uri dct:subject <category_uri>
+    """
+    return _fetch_dbpedia_categories(topic)
 
 
 def make_generate_shape_tool(llm):
@@ -443,41 +448,17 @@ def get_expected_answer_type(text, llm):
         raise ValueError("Text is None or empty")
 
     messages = [
-        (
-            "system",
-            """You are a Expected Answer Type Tool.
+        SystemMessage(content="""You are a Expected Answer Type Tool.
     Recognize named the expected answer type of the given question and output as RDF datatype and your confidence score.
     **Output ONLY the structured data.**
-    Below is a text for you to analyze."""
-        ),
-        (
-            "human", 
-            expected_answer_type_questions_and_expected_answer_types[0]["question"]
-        ),
-        (
-            "assistant",
-            f"{expected_answer_type_questions_and_expected_answer_types[0]['expected_answer_type']}"
-        ),
-        (
-            "human",
-            expected_answer_type_questions_and_expected_answer_types[1]["question"]
-        ),
-        (
-            "assistant",
-            f"{expected_answer_type_questions_and_expected_answer_types[1]['expected_answer_type']}"
-        ),
-        (
-            "human", 
-            expected_answer_type_questions_and_expected_answer_types[2]["question"]
-        ),
-        (
-            "assistant",
-            f"{expected_answer_type_questions_and_expected_answer_types[2]['expected_answer_type']}"
-        ),
-        (
-            "human", 
-            text
-        )
+    Below is a text for you to analyze."""),
+        HumanMessage(content=expected_answer_type_questions_and_expected_answer_types[0]["question"]),
+        AIMessage(content=f"{expected_answer_type_questions_and_expected_answer_types[0]['expected_answer_type']}"),
+        HumanMessage(content=expected_answer_type_questions_and_expected_answer_types[1]["question"]),
+        AIMessage(content=f"{expected_answer_type_questions_and_expected_answer_types[1]['expected_answer_type']}"),
+        HumanMessage(content=expected_answer_type_questions_and_expected_answer_types[2]["question"]),
+        AIMessage(content=f"{expected_answer_type_questions_and_expected_answer_types[2]['expected_answer_type']}"),
+        HumanMessage(content=text),
     ]
 
     result_text = llm.invoke(messages).content

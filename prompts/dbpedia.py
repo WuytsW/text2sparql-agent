@@ -80,6 +80,8 @@ feedback_step_dict = {
     - Try reversing the subject and object of the main triple — some properties (e.g. dbo:goldMedalist, dbo:museum, dbo:commander, dbo:spokenIn) have the named entity as the object, not the subject
     - Add UNION patterns for alternative access paths: location (dbo:location / dbo:city / dbo:city+dbo:isPartOf), birthplace (dbo:birthPlace direct / via dbo:country), country (dbo:country / dbp:country)
     - If structured properties fail entirely, try: ?uri dct:subject dbc:RelevantCategoryName
+    {category_hint}
+    {date_hint}
     - If the expected answer is a string literal (not a URI), try the dbp: property directly
     Review the shape generated earlier in the conversation and write a corrected query.
     If a property lists controlled values (e.g. [values: "X", "Y", ...]), use the appropriate value as a MANDATORY filter — do NOT make it OPTIONAL and do NOT replace it with a YAGO class.
