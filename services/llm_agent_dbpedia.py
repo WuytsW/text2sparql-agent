@@ -1,6 +1,7 @@
-from langsmith import Client
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, AIMessage, HumanMessage
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.tools import tool
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
@@ -11,15 +12,12 @@ from services.log_utils.LogLLMCallbackHandler import LogLLMCallbackHandler
 from services.log_utils.log import log_message, set_question_log
 from services.translate import translate_question
 
-from typing import List
-
 import os
 import json
 import logging
 import time
 
 from services.llm_utils import (
-    dbpedia_categories_tool,
     get_expected_answer_type,
     correct_query_prefixes,
 )
@@ -28,8 +26,9 @@ from services.ld_utils import execute, post_process
 from model.agent import PlanExecute
 from prompts.dbpedia import (
     system_prompt,
-    last_task,
-    feedback_step_dict,
+    sparql_planner_prompt,
+    generation_prompt,
+    check_result_prompt,
 )
 
 
@@ -43,7 +42,6 @@ class LLMAgentDBpedia:
             model_name: str = "openai/gpt-4o-mini",
             embedding_model_name: str = "intfloat/multilingual-e5-large",
             return_N: int = 5,
-            tools: List = [],
             lang: str = "en"
         ):
 
@@ -75,17 +73,12 @@ class LLMAgentDBpedia:
         ### END Load ICL VDB
 
         ### START Initialize agent
-        self._base_tools = tools
         self.current_model = model_name
         self.app = None
-
-        client = Client()
-        self.agent_prompt = client.pull_prompt("hwchase17/openai-functions-agent")
 
         self.log_handler = LogLLMCallbackHandler()
         self._init_llms(model_name)
         self._step_times: list = []
-        self._agent_call_count: int = 0
         ### END Initialize agent
 
     def _init_llms(self, model_name: str, log_calls: bool = False):
@@ -140,16 +133,23 @@ class LLMAgentDBpedia:
             callbacks=[self.log_handler]
         )
 
+        self.planner_llm = ChatOpenAI(
+            model=model_name,
+            api_key=os.getenv("mKGQAgent_Planner_LLM", os.getenv("mKGQAgent_Execution_original_LLM")),
+            base_url="https://openrouter.ai/api/v1",
+            callbacks=[self.log_handler]
+        )
+
+        self.check_llm = ChatOpenAI(
+            model=model_name,
+            api_key=os.getenv("mKGQAgent_Check_LLM", os.getenv("mKGQAgent_Context_LLM", os.getenv("mKGQAgent_Execution_original_LLM"))),
+            base_url="https://openrouter.ai/api/v1",
+            callbacks=[self.log_handler]
+        )
+
         self._context_graph = make_context_graph(
             self.entities_llm, self.shapes_llm, self.shape_check_llm,
             categories_llm=self.categories_llm, log_calls=log_calls
-        )
-
-        self.tools = [dbpedia_categories_tool] + self._base_tools
-
-        self.agent_runnable = create_tool_calling_agent(self.llm_execution_original, self.tools, self.agent_prompt)
-        self.agent_executor = AgentExecutor(
-            agent=self.agent_runnable, tools=self.tools, verbose=False
         )
 
         self.app = None  # reset workflow on model change
@@ -178,12 +178,6 @@ class LLMAgentDBpedia:
             log_message(step_name="Expected answer type", color="Yellow", messages=[eat])
         except Exception as e:
             log_message(step_name="Expected answer type failed", color="Red", messages=[str(e)])
-
-    def _plan_step(self, state: PlanExecute):
-        _t0 = time.perf_counter()
-        result = {"plan": ["generate SPARQL query with the context provided in the chat history", last_task[self.lang]]}
-        self._step_times.append(f"planner: {time.perf_counter() - _t0:.2f}s")
-        return result
 
     def _context_step(self, state: PlanExecute):
         result = self._context_graph.invoke({
@@ -217,97 +211,79 @@ class LLMAgentDBpedia:
         self._step_times.append({"context": result.get("step_times", {})})
         return {"chat_history": state["chat_history"] + [AIMessage(content=context_msg)]}
 
-    def _agent_step(self, state: PlanExecute):
-        self._agent_call_count += 1
+    def _sparql_loop_step(self, state: PlanExecute):
         _t0 = time.perf_counter()
-        task = state["feedback_task"] if state["gave_feedback"] else state["plan"].pop(0)
-        log_message(step_name="Agent task", color="Cyan", messages=[str(task)])
+        chat_history = state["chat_history"]
+        question = state["input"]
 
-        task_input = f"User question: '{state['input']}'\nTask: {task}"
+        @tool
+        def generate_sparql(suggestions: str = "") -> str:
+            """Generate a SPARQL query using the context in the conversation. Pass suggestions from a prior failed attempt if retrying."""
+            suggestions_block = f"\nPrior feedback:\n{suggestions}" if suggestions.strip() else ""
+            messages = chat_history + [HumanMessage(
+                generation_prompt[self.lang].format(question=question, suggestions_block=suggestions_block)
+            )]
+            return self.llm_execution_original.invoke(messages).content
 
-        try:
-            agent_response = self.agent_executor.invoke(
-                {"input": task_input, "chat_history": state["chat_history"]}
+        @tool
+        def execute_sparql(query: str) -> str:
+            """Execute a SPARQL query against DBpedia and return the results or error as JSON."""
+            try:
+                result = execute(query=query, endpoint_url=self.sparql_endpoint)
+                if isinstance(result, dict) and "error" not in result:
+                    bindings = result.get("results", {}).get("bindings", [])[:3]
+                    return json.dumps(bindings)
+                return json.dumps(result)
+            except Exception as e:
+                return json.dumps({"error": str(e)})
+
+        @tool
+        def check_result(query: str, execution_result: str) -> str:
+            """Validate whether the execution results correctly answer the question. Returns JSON with ok=true/false and optional suggestions."""
+            prompt_text = check_result_prompt[self.lang].format(
+                question=question, query=query, execution_result=execution_result
             )
-            output = agent_response["output"]
-        except Exception as e:
-            output = str(e)
-            agent_response = {"output": output, "intermediate_steps": []}
+            return self.check_llm.invoke([HumanMessage(prompt_text)]).content
 
-        state["chat_history"].append(AIMessage(output))
-        log_message(step_name="Agent response", color="Yellow", messages=[output])
-        self._step_times.append(f"agent_{self._agent_call_count}: {time.perf_counter() - _t0:.2f}s")
+        tools = [generate_sparql, execute_sparql, check_result]
 
-        return {
-            "past_steps": [task, output],
-            "intermediate_steps": [task, agent_response.get("intermediate_steps", [])],
-            "gave_feedback": state["gave_feedback"],
-        }
+        planner_prompt_template = ChatPromptTemplate.from_messages([
+            ("system", sparql_planner_prompt[self.lang]),
+            MessagesPlaceholder("chat_history"),
+            ("human", "{input}"),
+            MessagesPlaceholder("agent_scratchpad"),
+        ])
 
-    def _feedback_step(self, state: PlanExecute):
-        _t0 = time.perf_counter()
-        current_query = state["chat_history"][-1].content
-        feedback_has_results = False
-        feedback_is_timeout = False
+        agent = create_tool_calling_agent(
+            llm=self.planner_llm,
+            tools=tools,
+            prompt=planner_prompt_template,
+        )
+        executor = AgentExecutor(agent=agent, tools=tools, max_iterations=15, verbose=False)
+
         try:
-            feedback = execute(query=current_query, endpoint_url=self.sparql_endpoint)
-            if isinstance(feedback, dict) and "error" not in feedback:
-                bindings = feedback.get("results", {}).get("bindings", [])[:3]
-                if bindings:
-                    feedback_has_results = True
-                feedback = json.dumps(bindings)
-            elif isinstance(feedback, dict) and "timed out" in str(feedback.get("error", "")).lower():
-                feedback_is_timeout = True
-                feedback = json.dumps(feedback)
+            result = executor.invoke(
+                {"input": f"Question: {question}", "chat_history": chat_history},
+                config={"callbacks": [self.log_handler]}
+            )
+            final_query = result["output"]
         except Exception as e:
-            feedback = str(e)
-            if "timed out" in str(e).lower():
-                feedback_is_timeout = True
+            logging.error(f"SPARQL loop failed: {e}")
+            final_query = str(e)
 
-        log_message(step_name="Feedback", color="Yellow", messages=[str(feedback)])
-
-        feedback_task = str(feedback_step_dict[self.lang].format(
-            question=state["input"],
-            query=current_query,
-            feedback=feedback,
-            last_task=last_task[self.lang]
-        ))
-        self._step_times.append(f"feedback: {time.perf_counter() - _t0:.2f}s")
-        return {
-            "feedback_task": feedback_task,
-            "gave_feedback": True,
-            "feedback_has_results": feedback_has_results,
-            "feedback_is_timeout": feedback_is_timeout,
-        }
-
-    def _feedback_router(self, state: PlanExecute):
-        if len(state["plan"]) > 0:
-            return "agent"
-        if not state["gave_feedback"]:
-            return "feedback"
-        if state.get("feedback_is_timeout", False):
-            return END
-        return END
+        log_message(step_name="SPARQL loop result", color="Yellow", messages=[final_query])
+        self._step_times.append(f"sparql_loop: {time.perf_counter() - _t0:.2f}s")
+        return {"chat_history": chat_history + [AIMessage(final_query)]}
 
     def _init_workflow(self):
         workflow = StateGraph(PlanExecute)
 
-        workflow.add_node("planner", self._plan_step)
         workflow.add_node("context", self._context_step)
-        workflow.add_node("agent", self._agent_step)
-        workflow.add_node("feedback", self._feedback_step)
+        workflow.add_node("sparql_loop", self._sparql_loop_step)
 
-        workflow.set_entry_point("planner")
-        workflow.add_edge("planner", "context")
-        workflow.add_edge("context", "agent")
-
-        workflow.add_conditional_edges(
-            "agent",
-            self._feedback_router,
-            {"feedback": "feedback", "agent": "agent", END: END}
-        )
-
-        workflow.add_edge("feedback", "agent")
+        workflow.set_entry_point("context")
+        workflow.add_edge("context", "sparql_loop")
+        workflow.add_edge("sparql_loop", END)
 
         self.app = workflow.compile()
 
