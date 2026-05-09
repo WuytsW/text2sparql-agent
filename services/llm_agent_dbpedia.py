@@ -133,8 +133,16 @@ class LLMAgentDBpedia:
             callbacks=[self.log_handler]
         )
 
+        self.categories_llm = ChatOpenAI(
+            model=model_name,
+            api_key=os.getenv("mKGQAgent_Categories_LLM"),
+            base_url="https://openrouter.ai/api/v1",
+            callbacks=[self.log_handler]
+        )
+
         self._context_graph = make_context_graph(
-            self.entities_llm, self.shapes_llm, self.shape_check_llm, log_calls=log_calls
+            self.entities_llm, self.shapes_llm, self.shape_check_llm,
+            categories_llm=self.categories_llm, log_calls=log_calls
         )
 
         self.tools = [dbpedia_categories_tool] + self._base_tools
@@ -184,21 +192,27 @@ class LLMAgentDBpedia:
             "failed_attempts": [],
             "entities": [],
             "entity_uris": [],
+            "categories": [],
             "shape": "",
             "check_valid": False,
             "check_reason": "",
             "accepted_shape": None,
             "accepted_entity_uris": None,
-            "step_times": {"extraction": [], "el": [], "shape": [], "check": []},
+            "accepted_categories": None,
+            "step_times": {"extraction": [], "el": [], "dbc": [], "shape": [], "check": []},
         })
 
         accepted_shape = result.get("accepted_shape") or result.get("shape") or "No shape generated."
         entity_uris = result.get("accepted_entity_uris") or result.get("entity_uris") or []
+        categories = result.get("accepted_categories") or result.get("categories") or []
 
         context_msg = (
             f"Entity URIs: {json.dumps(entity_uris)}\n"
             f"Shape:\n{accepted_shape}"
         )
+        if categories:
+            cats_str = "\n".join(f"  {c['uri']}  ({c['label']})" for c in categories)
+            context_msg += f"\nDBpedia Categories (dbc:):\n{cats_str}"
         log_message(step_name="Context generated", color="Cyan", messages=[context_msg])
         self._step_times.append({"context": result.get("step_times", {})})
         return {"chat_history": state["chat_history"] + [AIMessage(content=context_msg)]}
