@@ -12,7 +12,7 @@ _DBPEDIA_URL = os.getenv("DBPEDIA_SPARQL_URL", "https://dbpedia.org/sparql")
 _CATEGORY_PREFIX = "http://dbpedia.org/resource/Category:"
 
 
-def _fetch_categories_for_topic(topic: str, limit: int = 20) -> list[dict]:
+def _fetch_categories_for_topic(topic: str, limit: int = 50) -> list[dict]:
     """Query DBpedia for dbc: category URIs matching a topic string."""
     search_term = topic.lower().replace(" ", "_")
     query = f"""
@@ -67,7 +67,7 @@ def fetch_categories(nlq: str, entities: list[str], llm=None) -> list[dict]:
     results: list[dict] = []
 
     for entity in entities[:20]:
-        for cat in _fetch_categories_for_topic(entity, limit=20):
+        for cat in _fetch_categories_for_topic(entity, limit=50):
             if cat["uri"] not in seen_uris:
                 seen_uris.add(cat["uri"])
                 results.append(cat)

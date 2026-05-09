@@ -52,39 +52,6 @@ Examples:
 "Animal" → CLASS"""
 }
 
-entities_extraction_prompt_old = {
-    "en": """Extract the DBpedia entity and class labels needed to answer the following question with a SPARQL query.
-
-Question: "{nlq}"
-
-Rules:
-- Use singular form and capitalise as a DBpedia class would be (e.g. "City" not "cities").
-- Descriptive adjectives like "extinct", "largest", "female" are filters, NOT entities — do not extract them.
-- Include a specific named entity only if the question refers to one (e.g. "Uzi", "Skype").
-- If the question contains names where both name and surname are mentioned, extract the full name (e.g. "Michael Jackson" NOT "Michael" or "Jackson").
-- If a named entity is referred to by only a partial name (surname, nickname, or single historical name), expand it (return only full names) to the most complete, commonly recognized full name (e.g. "Napoleon" → "Napoleon Bonaparte").
-- Only extract a class label if it appears as an explicit noun category in the question (e.g. "movies", "museums", "state"). Never extract "Person" — it is too generic to be useful. Use specific subclasses only if the question explicitly names them (e.g. "Actor", "Politician", "Writer").
-- Return ONLY a comma-separated list of labels, no explanations.
-
-Example: "Who developed Skype?"
-Result: "Skype"
-
-Example: "Which other weapons did the designer of the Uzi develop?"
-Result: "Uzi, Weapon"
-
-Example: "Which city in France has the most museums?"
-Result: "City, France"
-
-Example: "Which people were born in Heraklion?"
-Result: "Heraklion"
-
-Example: "Show me all museums in London."
-Result: "Museum, London"
-
-Example: "Where was Nikola Tesla born?"
-Result: "Nikola Tesla" NOT "Person"
-"""
-}
 
 context_check_prompt = {
     "en": """You are evaluating whether the context extracted from DBpedia contains enough relevant information to answer the question with a SPARQL query.
@@ -188,29 +155,10 @@ Query:
 Execution result:
 {execution_result}
 
-If results are non-empty and answer the question respond with exactly (JSON only, no markdown):
+If results are non-empty (and answer the question (Do not be strict here, most often if the result is non-empty it is acceptable)) respond with exactly (JSON only, no markdown):
 {{"ok": true}}
 
 If results are empty, an error, or do not answer the question respond with (JSON only, no markdown):
 {{"ok": false, "suggestions": "<concrete fix suggestions based on the shape and context in the conversation>"}}"""
 }
 
-query_correction_prompt = {
-    "en": """You are a SPARQL expert. Review the query below and replace any `dbp:` properties that have well-known semantic equivalents in `foaf:`, `dbo:`, or `schema:`.
-
-Only replace properties from this list:
-- dbp:homepage → foaf:homepage
-- dbp:nick → foaf:nick
-- dbp:name → foaf:name
-- dbp:depiction → foaf:depiction
-- dbp:mbox → foaf:mbox
-- dbp:abstract → dbo:abstract
-- dbp:thumbnail → dbo:thumbnail
-
-Do NOT change any other properties. Do NOT change resource URIs or PREFIX declarations.
-
-Query:
-{query}
-
-Return ONLY the (possibly corrected) SPARQL query. No explanation. No code fences."""
-}

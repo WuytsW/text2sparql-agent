@@ -1,4 +1,5 @@
 import json
+import re
 import requests
 from fuzzywuzzy import fuzz
 from SPARQLWrapper import SPARQLWrapper, JSON
@@ -77,13 +78,95 @@ def extract_code_blocks(text):
         code_blocks = re.findall(pattern, text, re.DOTALL)
         return code_blocks
 
+def fix_union_syntax(query: str) -> str:
+    """Rewrite top-level UNION to valid nested UNION inside WHERE clause.
+
+    Converts:
+      SELECT ... WHERE { body1 } UNION { SELECT ... WHERE { body2 } } UNION ...
+    To:
+      SELECT ... WHERE { { body1 } UNION { body2 } UNION ... }
+    """
+    where_match = re.search(r'\bWHERE\s*\{', query, re.IGNORECASE)
+    if not where_match:
+        return query
+
+    where_open = where_match.end() - 1
+
+    depth = 0
+    first_where_close = -1
+    for i in range(where_open, len(query)):
+        if query[i] == '{':
+            depth += 1
+        elif query[i] == '}':
+            depth -= 1
+            if depth == 0:
+                first_where_close = i
+                break
+
+    if first_where_close == -1:
+        return query
+
+    after = query[first_where_close + 1:].lstrip()
+    if not after.upper().startswith('UNION'):
+        return query
+
+    select_prefix = query[:where_open + 1]
+    first_body = query[where_open + 1:first_where_close]
+
+    def extract_block_body(text):
+        """Return (content_inside_braces, rest_of_text) for the leading { } block."""
+        if not text.startswith('{'):
+            return None, text
+        depth = 0
+        for i in range(len(text)):
+            if text[i] == '{':
+                depth += 1
+            elif text[i] == '}':
+                depth -= 1
+                if depth == 0:
+                    return text[1:i], text[i + 1:].lstrip()
+        return None, text
+
+    def unwrap_sub_select(body):
+        """Strip SELECT ... WHERE { } wrapper, keeping only the inner body."""
+        body = body.strip()
+        m = re.match(r'SELECT\b.*?\bWHERE\s*\{', body, re.IGNORECASE | re.DOTALL)
+        if not m:
+            return body
+        inner_open = m.end() - 1
+        depth = 0
+        for i in range(inner_open, len(body)):
+            if body[i] == '{':
+                depth += 1
+            elif body[i] == '}':
+                depth -= 1
+                if depth == 0:
+                    return body[inner_open + 1:i]
+        return body
+
+    union_bodies = []
+    remaining = after
+    while remaining.upper().startswith('UNION'):
+        after_kw = remaining[5:].lstrip()
+        block_content, remaining = extract_block_body(after_kw)
+        if block_content is None:
+            break
+        union_bodies.append(unwrap_sub_select(block_content))
+
+    all_bodies = [first_body] + union_bodies
+    union_parts = ' UNION '.join(f'{{ {b.strip()} }}' for b in all_bodies)
+    return f'{select_prefix} {union_parts} }}'
+
+
 def post_process(result):
     blocks = extract_code_blocks(result)
     if len(blocks) > 0:
         query = blocks[0].strip()
     else:
         query = result.strip()
-    
+
+    query = fix_union_syntax(query)
+
     parse_object = parseQuery(query)
     query_prefixes = [prefix.prefix for prefix in parse_object[0]] if len(parse_object[0]) > 0 else []
     query = '\n'.join([list(pref.values())[0] for pref in prefixes_list if list(pref.keys())[0] not in query_prefixes]) + '\n' + query
