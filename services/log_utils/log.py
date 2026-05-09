@@ -54,3 +54,6 @@ def log_message(step_name: str, color: str = "White", messages: list = None):
             line = f"{colorCode}{message}{RESET}"
             print(line)
             _append_to_question_log(line)
+
+def log_warning(step_name: str, error_message: str):
+    log_message(step_name, color="Red", messages=[f"Error: {error_message}"])

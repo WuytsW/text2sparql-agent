@@ -22,7 +22,7 @@ class ContextState(TypedDict):
     step_times: dict
 
 
-def make_context_graph(entities_llm, shapes_llm, check_llm):
+def make_context_graph(entities_llm, shapes_llm, check_llm, log_calls: bool = False) -> StateGraph:
     """
     Builds and compiles the context-generation LangGraph sub-graph.
 
@@ -66,7 +66,7 @@ def make_context_graph(entities_llm, shapes_llm, check_llm):
     def shape_node(state: ContextState) -> dict:
         _t0 = time.perf_counter()
         try:
-            shape = generate_shape(state["nlq"], state["entities"], shapes_llm) or ""
+            shape = generate_shape(state["nlq"], state["entities"], shapes_llm, log_calls=log_calls) or ""
         except Exception as e:
             logging.warning(f"[context_graph] shape_generation failed: {e}")
             shape = ""
