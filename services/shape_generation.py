@@ -1,8 +1,6 @@
 import os
 import re as _re
-import logging
 from concurrent.futures import ThreadPoolExecutor
-from shexer.shaper import Shaper
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 from prompts.dbpedia import (
@@ -10,6 +8,7 @@ from prompts.dbpedia import (
     shape_selection_prompt_per_entity,
     class_instances_prompt,
 )
+from services.log_utils import log_message, log_warning
 from SPARQLWrapper import SPARQLWrapper, JSON
 
 load_dotenv(dotenv_path=".env")
@@ -34,12 +33,6 @@ _MAX_PROPS_WITHOUT_FILTER = 30
 
 # Matches "prop -> range" lines (with optional leading whitespace)
 _PROP_RANGE_RE = _re.compile(r"^\s*(\S+)\s*->\s*(\S+)\s*$")
-
-# Parses a single shexer ShEx statement line: "   dbo:capital  IRI  ;"
-_SHEX_STMT_RE = _re.compile(r"^\s{1,6}(\^?[\w:<>]+)\s+(@?[\w:<>\[\]]+)")
-
-# Properties to skip when parsing ShEx output
-_SKIP_PROPS = {"rdf:type"}
 
 
 # ---------------------------------------------------------------------------
@@ -68,6 +61,8 @@ def _normalize_range(r: str) -> str:
         return "IRI"
     if r.startswith("<") and r.endswith(">"):
         return _shorten_uri(r[1:-1])
+    if r.startswith("http://") or r.startswith("https://"):
+        return _shorten_uri(r)
     return r
 
 
@@ -79,36 +74,14 @@ def _tbox_to_prop_range_items(properties: list) -> list:
     ]
 
 
-def _parse_shex_to_prop_range_items(shex_string: str) -> list:
-    """
-    Parse a shexer ShEx block into prop -> range strings compatible with
-    select_relevant_shape_parts and add_possible_values_to_shape.
-    Skips rdf:type lines and structural tokens (PREFIX, shape name, braces).
-    """
-    items = []
-    for line in shex_string.splitlines():
-        s = line.strip()
-        if not s or s in ("{", "}") or s.startswith(("PREFIX", "shapes:", "<http")):
-            continue
-        m = _SHEX_STMT_RE.match(line)
-        if not m:
-            continue
-        prop = m.group(1)
-        range_ = _normalize_range(m.group(2))
-        if prop in _SKIP_PROPS:
-            continue
-        items.append(f"{prop} -> {range_}")
-    return items
-
-
 # ---------------------------------------------------------------------------
 # SPARQL helpers
 # ---------------------------------------------------------------------------
 
-def get_tbox_properties(class_uri: str, sparql_endpoint: str) -> list:
+def get_tbox_properties(class_uri: str, sparql_endpoint: str, log_calls: bool = False) -> list:
     """
     Returns all properties applicable to a class (including inherited via rdfs:subClassOf*).
-    Each result is a dict with 'prop', 'domain', and optionally 'range'.
+    Each result is a shortened 'prop -> range' string.
     """
     query = f"""
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -125,7 +98,8 @@ SELECT DISTINCT ?prop ?domain ?range WHERE {{
         sparql.setReturnFormat(JSON)
         result = sparql.query().convert()
     except Exception as e:
-        logging.warning(f"[get_tbox_properties] T-Box query failed for <{class_uri}>: {e}")
+        if log_calls:
+            log_warning("get_tbox_properties", str(e))
         return []
 
     properties = []
@@ -136,15 +110,21 @@ SELECT DISTINCT ?prop ?domain ?range WHERE {{
         if prop:
             properties.append({"prop": prop, "domain": domain, "range": range_})
 
-    #logging.info(f"[get_tbox_properties] Found {len(properties)} properties for <{class_uri}>")
-    return properties
+    items = _tbox_to_prop_range_items(properties)
+    if log_calls:
+        log_message("get_tbox_properties", "Cyan", [
+            _shorten_uri(class_uri),
+            str(len(items)),
+            str(items),
+        ])
+    return items
 
 
-def get_abox_dbp_properties(class_uri: str, sparql_endpoint: str, sample_size: int = 3) -> list:
+def get_abox_dbp_properties(class_uri: str, sparql_endpoint: str, sample_size: int = 3, log_calls: bool = False) -> list:
     """
     Returns dbp: (raw Wikipedia infobox) properties found on sample instances of a class.
     These are NOT in the T-Box but frequently hold the actual data values in DBpedia.
-    Each result is a dict with 'prop' (full URI) and 'range' (empty string, unknown from A-box).
+    Each result is a shortened 'prop -> IRI' string (range unknown from A-box).
     """
     dbp_ns = "http://dbpedia.org/property/"
     query = f"""
@@ -161,7 +141,8 @@ SELECT DISTINCT ?prop WHERE {{
         sparql.setReturnFormat(JSON)
         result = sparql.query().convert()
     except Exception as e:
-        #logging.warning(f"[get_abox_dbp_properties] A-Box dbp: query failed for <{class_uri}>: {e}")
+        if log_calls:
+            log_warning("get_abox_dbp_properties", str(e))
         return []
 
     properties = []
@@ -172,11 +153,17 @@ SELECT DISTINCT ?prop WHERE {{
             seen.add(prop)
             properties.append({"prop": prop, "domain": "", "range": ""})
 
-    #logging.info(f"[get_abox_dbp_properties] Found {len(properties)} dbp: properties for <{class_uri}>")
-    return properties
+    items = _tbox_to_prop_range_items(properties)
+    if log_calls:
+        log_message("get_abox_dbp_properties", "Cyan", [
+            _shorten_uri(class_uri),
+            str(len(items)),
+            str(items),
+        ])
+    return items
 
 
-def _query_property_values(prop_prefixed: str, sparql_endpoint: str) -> list:
+def _query_property_values(prop_prefixed: str, sparql_endpoint: str, log_calls: bool = False) -> list:
     """
     Returns distinct values for prop_prefixed if the property has at most
     _MAX_ENUM_VALUES distinct values (controlled vocabulary check via LIMIT trick).
@@ -193,7 +180,8 @@ def _query_property_values(prop_prefixed: str, sparql_endpoint: str) -> list:
         sparql.setReturnFormat(JSON)
         result = sparql.query().convert()
     except Exception as e:
-        #logging.warning(f"[_query_property_values] Failed for {prop_prefixed}: {e}")
+        if log_calls:
+            log_warning("_query_property_values", str(e))
         return []
     bindings = result.get("results", {}).get("bindings", [])
     if len(bindings) > _MAX_ENUM_VALUES:
@@ -208,10 +196,16 @@ def _query_property_values(prop_prefixed: str, sparql_endpoint: str) -> list:
             values.append(_shorten_uri(val))
         else:
             values.append('"' + val + '"')
+    if log_calls:
+        log_message("_query_property_values", "Cyan", [
+            prop_prefixed,
+            str(len(values)),
+            str(values),
+        ])
     return values
 
 
-def add_possible_values_to_shape(relevant_items: list, sparql_endpoint: str) -> str:
+def add_possible_values_to_shape(relevant_items: list, sparql_endpoint: str, log_calls: bool = False) -> str:
     """
     For each prop -> range item, queries the A-Box for distinct values using
     cardinality filtering. Properties with few distinct values (controlled
@@ -227,7 +221,7 @@ def add_possible_values_to_shape(relevant_items: list, sparql_endpoint: str) -> 
             result_lines.append(item)
             continue
         prop, range_ = m.group(1), _normalize_range(m.group(2))
-        values = _query_property_values(prop, sparql_endpoint)
+        values = _query_property_values(prop, sparql_endpoint, log_calls=log_calls)
         if values:
             vals_str = ", ".join(values)
             result_lines.append(f"{prop} -> {range_} [values: {vals_str}]")
@@ -268,25 +262,61 @@ def select_relevant_shape_parts(nlq: str, shape: str, llm, label: str = None) ->
 # Per-entity pipeline
 # ---------------------------------------------------------------------------
 
-def _run_shexer_for_entity(label_clean: str, endpoint: str, namespaces_dict: dict) -> str:
+def _run_sparql_for_entity(label_clean: str, endpoint: str, log_calls: bool = False) -> list:
     """
-    Run shexer for a single named entity and return the raw ShEx string.
-    Returns empty string on failure.
+    Query DBpedia A-Box for all properties of a named entity and return
+    prop -> range items directly.
     """
-    entity_id = f"http://dbpedia.org/resource/{label_clean}"
-    shape_label = f"http://shapes.dbpedia.org/{label_clean}"
-    shape_map_raw = f"<{entity_id}>@<{shape_label}>"
+    entity_uri = f"http://dbpedia.org/resource/{label_clean}"
+    query = f"""
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT DISTINCT ?p (SAMPLE(?declaredRange) AS ?range) (SAMPLE(?o) AS ?sampleO)
+WHERE {{
+  <{entity_uri}> ?p ?o .
+  OPTIONAL {{ ?p rdfs:range ?declaredRange }}
+  FILTER(?p != <http://www.w3.org/1999/02/22-rdf-syntax-ns#type>)
+}}
+GROUP BY ?p
+LIMIT 200
+"""
     try:
-        shaper = Shaper(
-            shape_map_raw=shape_map_raw,
-            url_endpoint=endpoint,
-            namespaces_dict=namespaces_dict,
-            disable_comments=True,
-        )
-        return shaper.shex_graph(string_output=True) or ""
+        sparql = SPARQLWrapper(endpoint)
+        sparql.timeout = 30
+        sparql.setQuery(query)
+        sparql.setReturnFormat(JSON)
+        result = sparql.query().convert()
     except Exception as e:
-        #logging.warning(f"[_run_shexer_for_entity] shexer failed for {label_clean}: {e}")
-        return ""
+        if log_calls:
+            log_warning("_run_sparql_for_entity", str(e))
+        return []
+
+    items = []
+    for binding in result.get("results", {}).get("bindings", []):
+        prop_uri = binding.get("p", {}).get("value", "")
+        if not prop_uri:
+            continue
+        prop_short = _shorten_uri(prop_uri)
+
+        range_data = binding.get("range", {})
+        sample_o = binding.get("sampleO", {})
+
+        if range_data.get("value"):
+            range_short = _shorten_uri(range_data["value"])
+        elif sample_o.get("type") == "uri":
+            range_short = "IRI"
+        else:
+            dt = sample_o.get("datatype", "")
+            range_short = _shorten_uri(dt) if dt else "xsd:string"
+
+        items.append(f"{prop_short} -> {range_short}")
+
+    if log_calls:
+        log_message("_run_sparql_for_entity", "Cyan", [
+            label_clean,
+            str(len(items)),
+            str(items),
+        ])
+    return items
 
 
 def _process_entity_section(
@@ -295,6 +325,7 @@ def _process_entity_section(
     nlq: str,
     llm,
     endpoint: str,
+    log_calls: bool = False,
 ) -> str:
     """
     Runs the filter -> values pipeline for one entity and returns a labeled
@@ -306,7 +337,7 @@ def _process_entity_section(
         items = select_relevant_shape_parts(nlq, "\n".join(items), llm, label=label_clean)
     if not items:
         return ""
-    enriched = add_possible_values_to_shape(items, endpoint)
+    enriched = add_possible_values_to_shape(items, endpoint, log_calls=log_calls)
     if not enriched.strip():
         return ""
     indented = "\n".join(f"  {line}" for line in enriched.splitlines())
@@ -317,38 +348,16 @@ def _process_entity_section(
 # Public API
 # ---------------------------------------------------------------------------
 
-_NAMESPACES_DICT = {
-    "http://example.org/": "ex",
-    "http://www.w3.org/1999/02/22-rdf-syntax-ns#": "rdf",
-    "http://www.w3.org/2000/01/rdf-schema#": "rdfs",
-    "http://www.w3.org/2001/XMLSchema#": "xsd",
-    "http://xmlns.com/foaf/0.1/": "foaf",
-    "http://dbpedia.org/resource/": "dbr",
-    "http://dbpedia.org/ontology/": "dbo",
-    "http://dbpedia.org/property/": "dbp",
-    "http://dbpedia.org/class/yago/": "yago",
-    "http://purl.org/dc/terms/": "dcterms",
-    "http://www.w3.org/2002/07/owl#": "owl",
-    "http://www.w3.org/2007/05/powder-s#": "powders",
-    "http://www.w3.org/ns/prov#": "prov",
-    "http://umbel.org/umbel/rc/": "umbel",
-    "http://schema.org/": "schema",
-    "http://shapes.dbpedia.org/": "shapes",
-}
-
-
-def _process_label(label: str, nlq: str, shapes_llm, endpoint: str):
+def _process_label(label: str, nlq: str, shapes_llm, endpoint: str, log_calls: bool = False) -> str:
     label_clean = label.replace(" ", "_")
     label_clean = label_clean[0].upper() + label_clean[1:]
 
     if _llm_classify(label_clean, shapes_llm):
         class_uri = f"http://dbpedia.org/ontology/{label_clean}"
-        props = get_tbox_properties(class_uri, endpoint)
-        items = _tbox_to_prop_range_items(props)
+        items = get_tbox_properties(class_uri, endpoint, log_calls=log_calls)
         # Also fetch raw Wikipedia infobox (dbp:) properties from A-box sample instances.
         # These are absent from the T-Box but often hold the actual data values.
-        dbp_props = get_abox_dbp_properties(class_uri, endpoint)
-        dbp_items = _tbox_to_prop_range_items(dbp_props)
+        dbp_items = get_abox_dbp_properties(class_uri, endpoint, log_calls=log_calls)
         # Merge, avoiding duplicates (dbo: items take precedence).
         existing_props = {item.split(" ->")[0].strip() for item in items}
         for dbp_item in dbp_items:
@@ -357,33 +366,27 @@ def _process_label(label: str, nlq: str, shapes_llm, endpoint: str):
                 items.append(dbp_item)
                 existing_props.add(dbp_key)
     else:
-        shex_str = _run_shexer_for_entity(label_clean, endpoint, _NAMESPACES_DICT)
-        items = _parse_shex_to_prop_range_items(shex_str)
+        items = _run_sparql_for_entity(label_clean, endpoint, log_calls=log_calls)
 
-    return _process_entity_section(label_clean, items, nlq, shapes_llm, endpoint)
+    return _process_entity_section(label_clean, items, nlq, shapes_llm, endpoint, log_calls=log_calls)
 
 
-def generate_shape(nlq: str, entity_labels: list, shapes_llm):
+def generate_shape(nlq: str, entity_labels: list, shapes_llm, log_calls: bool = False) -> str:
     load_dotenv(dotenv_path=".env")
     endpoint = os.getenv("DBPEDIA_SPARQL_URL")
-    #logging.info(f"[generate_shape] Entity labels: {entity_labels}")
 
     try:
         with ThreadPoolExecutor() as executor:
             results = list(executor.map(
-                lambda label: _process_label(label, nlq, shapes_llm, endpoint),
+                lambda label: _process_label(label, nlq, shapes_llm, endpoint, log_calls=log_calls),
                 entity_labels
             ))
         sections = [s for s in results if s]
 
     except Exception as e:
-        #logging.error(f"[generate_shape] Failed: {e}", exc_info=True)
         return None
 
     if not sections:
-        #logging.warning(f"[generate_shape] No sections produced for labels: {entity_labels}")
         return None
 
-    result = "\n\n".join(sections)
-
-    return result
+    return "\n\n".join(sections)

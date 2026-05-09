@@ -88,7 +88,7 @@ class LLMAgentDBpedia:
         self._agent_call_count: int = 0
         ### END Initialize agent
 
-    def _init_llms(self, model_name: str):
+    def _init_llms(self, model_name: str, log_calls: bool = False):
         self.llm_eat = ChatOpenAI(
             model=model_name,
             api_key=os.getenv("mKGQAgent_EAT_LLM"),
@@ -134,7 +134,7 @@ class LLMAgentDBpedia:
         )
 
         self._context_graph = make_context_graph(
-            self.entities_llm, self.shapes_llm, self.shape_check_llm
+            self.entities_llm, self.shapes_llm, self.shape_check_llm, log_calls=log_calls
         )
 
         self.tools = [dbpedia_categories_tool] + self._base_tools
@@ -325,7 +325,7 @@ class LLMAgentDBpedia:
         """
         try:
             if model_name != self.current_model:
-                self._init_llms(model_name)
+                self._init_llms(model_name, log_calls=log_calls)
             if self.app is None:
                 self._init_workflow()
 
