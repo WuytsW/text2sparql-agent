@@ -12,8 +12,8 @@ from langchain.tools import tool
 from SPARQLWrapper import SPARQLWrapper, JSON as SPARQL_JSON
 from services.log_utils.log import log_message
 
-from services.shape_generation import generate_shape
-from services.category_linking import _fetch_categories_for_topic
+from services.context_utils.shape_generation import generate_shape
+from services.context_utils.category_linking import _fetch_categories_for_topic
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 
 
@@ -79,7 +79,7 @@ def wikidata_el(ne_list: list) -> list:
 
 def make_extract_entities_tool(llm):
     """Factory that returns an extract_entities_tool bound to the given LLM."""
-    from services.entity_extraction import extract_entities
+    from services.context_utils.entity_extraction import extract_entities
 
     @tool("extract_entities_tool", args_schema=EntityExtractionInput)
     def extract_entities_tool(nlq: str) -> list[str]:
@@ -134,7 +134,7 @@ class EntityLinkingInput(BaseModel):
 
 def make_entity_linking_tool():
     """Factory that returns an entity_linking_tool wrapping dbpedia_el."""
-    from services.entity_linking import dbpedia_el
+    from services.context_utils.entity_linking import dbpedia_el
 
     @tool("entity_linking_tool", args_schema=EntityLinkingInput)
     def entity_linking_tool(nlq: str, ne_list: list) -> str:
@@ -177,23 +177,32 @@ def make_execute_sparql_tool(endpoint: str):
     return execute_sparql_tool
 
 
-class ShapeCheckInput(BaseModel):
+class ContextCheckInput(BaseModel):
     nlq: str = Field(description="The natural language question")
-    shape: str = Field(description="The DBpedia shape text to evaluate")
+    entities: list = Field(description="Extracted entity/class labels")
+    entity_uris: list = Field(description="Linked DBpedia URIs for the entities")
+    categories: list = Field(description="DBpedia category URIs and labels")
+    shape: str = Field(description="The DBpedia shape text (available properties)")
 
 
-def make_shape_check_tool(llm):
-    """Factory that returns a shape_check_tool bound to the given LLM."""
-    from prompts.dbpedia import shape_check_prompt
+def make_context_check_tool(llm):
+    """Factory that returns a context_check_tool bound to the given LLM."""
+    from prompts.dbpedia import context_check_prompt
 
-    @tool("shape_check_tool", args_schema=ShapeCheckInput)
-    def shape_check_tool(nlq: str, shape: str) -> dict:
+    @tool("context_check_tool", args_schema=ContextCheckInput)
+    def context_check_tool(nlq: str, entities: list, entity_uris: list, categories: list, shape: str) -> dict:
         """
-        Evaluates whether a DBpedia shape is useful for answering the question.
+        Evaluates whether the full extracted context (entities, URIs, categories, shape) is useful for answering the question.
         Returns a dict with 'valid' (bool) and 'reason' (str).
         """
         import json as _json
-        prompt = shape_check_prompt["en"].format(nlq=nlq, shape=shape or "(empty)")
+        prompt = context_check_prompt["en"].format(
+            nlq=nlq,
+            entities=entities or [],
+            entity_uris=entity_uris or [],
+            categories=categories or [],
+            shape=shape or "(empty)",
+        )
         response = llm.invoke([{"role": "user", "content": prompt}])
         raw = response.content.strip()
         try:
@@ -203,7 +212,7 @@ def make_shape_check_tool(llm):
             valid = "true" in raw.lower() and "false" not in raw.lower()
             return {"valid": valid, "reason": raw}
 
-    return shape_check_tool
+    return context_check_tool
 
 
 _PREFIX_CORRECTIONS = {
