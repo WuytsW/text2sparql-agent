@@ -389,4 +389,4 @@ def generate_shape(nlq: str, entity_labels: list, shapes_llm, log_calls: bool = 
     if not sections:
         return None
 
-    return "\n\n".join(sections)
+    return "\n".join(sections)

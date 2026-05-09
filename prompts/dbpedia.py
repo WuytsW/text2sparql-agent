@@ -188,26 +188,28 @@ Result: "Nikola Tesla" NOT "Person"
 """
 }
 
-shape_check_prompt = {
-    "en": """You are evaluating whether a DBpedia knowledge graph shape is useful for answering a question.
+context_check_prompt = {
+    "en": """You are evaluating whether the context extracted from DBpedia contains enough relevant information to answer the question with a SPARQL query.
 
 Question: "{nlq}"
 
-Shape:
+Extracted entities: {entities}
+
+Entity URIs (linked DBpedia resources):
+{entity_uris}
+
+DBpedia categories:
+{categories}
+
+Shape (available properties per entity/class):
 {shape}
 
-A shape is USEFUL if:
-- It is non-empty (has at least one property line)
-- At least one property is plausibly relevant to answering the question
-- The entity labels correspond to real DBpedia resources or classes (not empty placeholders)
+Evaluate the context AS A WHOLE. It is USEFUL if any part of it — the shape, the entity URIs, or the categories — provides information that could plausibly help construct a SPARQL query to answer the question. Individual components may be empty or sparse; that is fine as long as the overall context is helpful.
 
-A shape is NOT USEFUL if:
-- It is empty or contains no property lines
-- None of the extracted properties relate to what the question is asking
-- The entity labels are clearly wrong or too generic for the question
+It is NOT USEFUL only if the context as a whole is clearly off-topic, completely empty, or the extracted entities are so wrong that no part of the context relates to the question.
 
-Respond with ONLY a JSON object in this exact format (no markdown, no explanation outside the JSON):
-{{"valid": true, "reason": "brief explanation of why the shape is useful"}}
+Respond with ONLY a JSON object (no markdown):
+{{"valid": true, "reason": "brief explanation"}}
 or
 {{"valid": false, "reason": "what is wrong and what entity labels might work better"}}"""
 }

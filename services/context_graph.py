@@ -32,13 +32,13 @@ def make_context_graph(entities_llm, shapes_llm, check_llm, categories_llm=None,
     On check failure: retry up to 3 times passing failed_attempts back to extract.
     After 3 failures: accept the last shape unconditionally.
     """
-    from services.entity_extraction import extract_entities
-    from services.entity_linking import dbpedia_el
-    from services.category_linking import fetch_categories
-    from services.shape_generation import generate_shape
-    from services.llm_utils import make_shape_check_tool
+    from services.context_utils.entity_extraction import extract_entities
+    from services.context_utils.entity_linking import dbpedia_el
+    from services.context_utils.category_linking import fetch_categories
+    from services.context_utils.shape_generation import generate_shape
+    from services.llm_utils import make_context_check_tool
 
-    _shape_check = make_shape_check_tool(check_llm)
+    _context_check = make_context_check_tool(check_llm)
 
     def extract_node(state: ContextState) -> dict:
         _t0 = time.perf_counter()
@@ -92,7 +92,13 @@ def make_context_graph(entities_llm, shapes_llm, check_llm, categories_llm=None,
     def check_node(state: ContextState) -> dict:
         _t0 = time.perf_counter()
         try:
-            result = _shape_check.invoke({"nlq": state["nlq"], "shape": state["shape"]})
+            result = _context_check.invoke({
+                "nlq": state["nlq"],
+                "entities": state["entities"],
+                "entity_uris": state["entity_uris"],
+                "categories": state["categories"],
+                "shape": state["shape"],
+            })
             valid = result.get("valid", False)
             reason = result.get("reason", "")
         except Exception as e:
@@ -101,7 +107,7 @@ def make_context_graph(entities_llm, shapes_llm, check_llm, categories_llm=None,
             reason = str(e)
 
         log_message(
-            step_name="[context] Shape check",
+            step_name="[context] Context check",
             color="Cyan",
             messages=[f"valid={valid}", reason],
         )

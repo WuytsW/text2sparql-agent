@@ -213,7 +213,7 @@ class LLMAgentDBpedia:
         if categories:
             cats_str = "\n".join(f"  {c['uri']}  ({c['label']})" for c in categories)
             context_msg += f"\nDBpedia Categories (dbc:):\n{cats_str}"
-        log_message(step_name="Context generated", color="Cyan", messages=[context_msg])
+        log_message(step_name="Context generated", color="Yellow", messages=[context_msg])
         self._step_times.append({"context": result.get("step_times", {})})
         return {"chat_history": state["chat_history"] + [AIMessage(content=context_msg)]}
 
@@ -321,7 +321,7 @@ class LLMAgentDBpedia:
             sparql = self.icl_json_data[idx]["sparql"]
             example += f"""\nInput: {question}\nOutput: {sparql}\n"""
             example += "--- End example ---"
-        log_message(step_name="Similar examples retrieved for ICL", color="Cyan", messages=[example])
+        log_message(step_name="Similar examples retrieved for ICL", color="Yellow", messages=[example])
         return example
 
     def generate_sparql(self, input_question: str, model_name: str = "openai/gpt-4o-mini", log_calls: bool = True, shape_step: bool = True) -> dict:
@@ -347,7 +347,7 @@ class LLMAgentDBpedia:
             self._agent_call_count = 0
             self.log_handler.reset(input_question, enabled=log_calls)
             set_question_log(input_question)
-            log_message(step_name="Original question", color="Yellow", messages=[input_question])
+            log_message(step_name="Original question", color="Green", messages=[input_question])
             chat_history = [SystemMessage(content=system_prompt[self.lang])]
 
             with get_openai_callback() as cb:
