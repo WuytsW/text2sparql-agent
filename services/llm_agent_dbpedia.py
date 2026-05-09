@@ -1,10 +1,7 @@
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, AIMessage, HumanMessage
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.tools import tool
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from langchain_community.callbacks import get_openai_callback
 from langgraph.graph import StateGraph, END
 from dotenv import load_dotenv
@@ -22,14 +19,10 @@ from services.llm_utils import (
     correct_query_prefixes,
 )
 from services.context_graph import make_context_graph
-from services.ld_utils import execute, post_process
+from services.sparql_graph import make_sparql_graph
+from services.ld_utils import post_process
 from model.agent import PlanExecute
-from prompts.dbpedia import (
-    system_prompt,
-    sparql_planner_prompt,
-    generation_prompt,
-    check_result_prompt,
-)
+from prompts.dbpedia import system_prompt
 
 
 class LLMAgentDBpedia:
@@ -133,13 +126,6 @@ class LLMAgentDBpedia:
             callbacks=[self.log_handler]
         )
 
-        self.planner_llm = ChatOpenAI(
-            model=model_name,
-            api_key=os.getenv("mKGQAgent_Planner_LLM", os.getenv("mKGQAgent_Execution_original_LLM")),
-            base_url="https://openrouter.ai/api/v1",
-            callbacks=[self.log_handler]
-        )
-
         self.check_llm = ChatOpenAI(
             model=model_name,
             api_key=os.getenv("mKGQAgent_Check_LLM", os.getenv("mKGQAgent_Context_LLM", os.getenv("mKGQAgent_Execution_original_LLM"))),
@@ -151,6 +137,8 @@ class LLMAgentDBpedia:
             self.entities_llm, self.shapes_llm, self.shape_check_llm,
             categories_llm=self.categories_llm, log_calls=log_calls
         )
+
+        self._sparql_graph = make_sparql_graph(self.llm_execution_original, self.check_llm)
 
         self.app = None  # reset workflow on model change
         self.current_model = model_name
@@ -213,67 +201,21 @@ class LLMAgentDBpedia:
 
     def _sparql_loop_step(self, state: PlanExecute):
         _t0 = time.perf_counter()
-        chat_history = state["chat_history"]
-        question = state["input"]
-
-        @tool
-        def generate_sparql(suggestions: str = "") -> str:
-            """Generate a SPARQL query using the context in the conversation. Pass suggestions from a prior failed attempt if retrying."""
-            suggestions_block = f"\nPrior feedback:\n{suggestions}" if suggestions.strip() else ""
-            messages = chat_history + [HumanMessage(
-                generation_prompt[self.lang].format(question=question, suggestions_block=suggestions_block)
-            )]
-            return self.llm_execution_original.invoke(messages).content
-
-        @tool
-        def execute_sparql(query: str) -> str:
-            """Execute a SPARQL query against DBpedia and return the results or error as JSON."""
-            try:
-                result = execute(query=query, endpoint_url=self.sparql_endpoint)
-                if isinstance(result, dict) and "error" not in result:
-                    bindings = result.get("results", {}).get("bindings", [])[:3]
-                    return json.dumps(bindings)
-                return json.dumps(result)
-            except Exception as e:
-                return json.dumps({"error": str(e)})
-
-        @tool
-        def check_result(query: str, execution_result: str) -> str:
-            """Validate whether the execution results correctly answer the question. Returns JSON with ok=true/false and optional suggestions."""
-            prompt_text = check_result_prompt[self.lang].format(
-                question=question, query=query, execution_result=execution_result
-            )
-            return self.check_llm.invoke([HumanMessage(prompt_text)]).content
-
-        tools = [generate_sparql, execute_sparql, check_result]
-
-        planner_prompt_template = ChatPromptTemplate.from_messages([
-            ("system", sparql_planner_prompt[self.lang]),
-            MessagesPlaceholder("chat_history"),
-            ("human", "{input}"),
-            MessagesPlaceholder("agent_scratchpad"),
-        ])
-
-        agent = create_tool_calling_agent(
-            llm=self.planner_llm,
-            tools=tools,
-            prompt=planner_prompt_template,
-        )
-        executor = AgentExecutor(agent=agent, tools=tools, max_iterations=15, verbose=False)
-
-        try:
-            result = executor.invoke(
-                {"input": f"Question: {question}", "chat_history": chat_history},
-                config={"callbacks": [self.log_handler]}
-            )
-            final_query = result["output"]
-        except Exception as e:
-            logging.error(f"SPARQL loop failed: {e}")
-            final_query = str(e)
-
+        result = self._sparql_graph.invoke({
+            "question": state["input"],
+            "chat_history": state["chat_history"],
+            "sparql_endpoint": self.sparql_endpoint,
+            "lang": self.lang,
+            "query": "",
+            "exec_result": "",
+            "check_ok": False,
+            "suggestions": "",
+            "attempt_count": 0,
+        })
+        final_query = result.get("query", "")
         log_message(step_name="SPARQL loop result", color="Yellow", messages=[final_query])
         self._step_times.append(f"sparql_loop: {time.perf_counter() - _t0:.2f}s")
-        return {"chat_history": chat_history + [AIMessage(final_query)]}
+        return {"chat_history": state["chat_history"] + [AIMessage(final_query)]}
 
     def _init_workflow(self):
         workflow = StateGraph(PlanExecute)
@@ -320,7 +262,6 @@ class LLMAgentDBpedia:
                 self._init_workflow()
 
             self._step_times = []
-            self._agent_call_count = 0
             self.log_handler.reset(input_question, enabled=log_calls)
             set_question_log(input_question)
             log_message(step_name="Original question", color="Green", messages=[input_question])
@@ -343,13 +284,6 @@ class LLMAgentDBpedia:
                     {
                         "input": translated_question,
                         "chat_history": chat_history,
-                        "gave_feedback": False,
-                        "plan": [],
-                        "past_steps": [],
-                        "intermediate_steps": [],
-                        "feedback_task": "",
-                        "feedback_has_results": False,
-                        "feedback_is_timeout": False,
                     },
                     config={"callbacks": [self.log_handler]}
                 )
@@ -386,7 +320,6 @@ if __name__ == "__main__":
         model_name="openai/gpt-4o-mini",
         embedding_model_name="intfloat/multilingual-e5-large",
         return_N=5,
-        tools=[],
         lang="en"
     )
 
