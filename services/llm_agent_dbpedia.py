@@ -75,10 +75,16 @@ class LLMAgentDBpedia:
         ### END Initialize agent
 
     def _init_llms(self, model_name: str, log_calls: bool = False):
+        # OpenRouter routes qwen models to Novita's /completions endpoint by default,
+        # but Novita only supports /chat/completions for these models. Ignoring Novita
+        # forces OpenRouter to pick a provider that handles chat completions correctly.
+        _or_kwargs = {"extra_body": {"provider": {"ignore": ["Novita"]}}}
+
         self.llm_eat = ChatOpenAI(
             model=model_name,
             api_key=os.getenv("mKGQAgent_EAT_LLM"),
             base_url="https://openrouter.ai/api/v1",
+            model_kwargs=_or_kwargs,
             callbacks=[self.log_handler]
         )
 
@@ -86,6 +92,7 @@ class LLMAgentDBpedia:
             model=model_name,
             api_key=os.getenv("mKGQAgent_Execution_original_LLM"),
             base_url="https://openrouter.ai/api/v1",
+            model_kwargs=_or_kwargs,
             callbacks=[self.log_handler]
         )
 
@@ -95,6 +102,7 @@ class LLMAgentDBpedia:
             base_url="https://openrouter.ai/api/v1",
             temperature=0.2,
             max_tokens=50,
+            model_kwargs=_or_kwargs,
             callbacks=[self.log_handler]
         )
 
@@ -102,6 +110,7 @@ class LLMAgentDBpedia:
             model=model_name,
             api_key=os.getenv("mKGQAgent_Shapes_LLM"),
             base_url="https://openrouter.ai/api/v1",
+            model_kwargs=_or_kwargs,
             callbacks=[self.log_handler]
         )
 
@@ -109,6 +118,7 @@ class LLMAgentDBpedia:
             model=model_name,
             api_key=os.getenv("mKGQAgent_Translation_LLM"),
             base_url="https://openrouter.ai/api/v1",
+            model_kwargs=_or_kwargs,
             callbacks=[self.log_handler]
         )
 
@@ -116,6 +126,7 @@ class LLMAgentDBpedia:
             model=model_name,
             api_key=os.getenv("mKGQAgent_Context_LLM", os.getenv("mKGQAgent_Execution_original_LLM")),
             base_url="https://openrouter.ai/api/v1",
+            model_kwargs=_or_kwargs,
             callbacks=[self.log_handler]
         )
 
@@ -123,6 +134,7 @@ class LLMAgentDBpedia:
             model=model_name,
             api_key=os.getenv("mKGQAgent_Categories_LLM"),
             base_url="https://openrouter.ai/api/v1",
+            model_kwargs=_or_kwargs,
             callbacks=[self.log_handler]
         )
 
@@ -130,6 +142,7 @@ class LLMAgentDBpedia:
             model=model_name,
             api_key=os.getenv("mKGQAgent_Check_LLM", os.getenv("mKGQAgent_Context_LLM", os.getenv("mKGQAgent_Execution_original_LLM"))),
             base_url="https://openrouter.ai/api/v1",
+            model_kwargs=_or_kwargs,
             callbacks=[self.log_handler]
         )
 
