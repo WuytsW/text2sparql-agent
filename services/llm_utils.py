@@ -13,6 +13,7 @@ from SPARQLWrapper import SPARQLWrapper, JSON as SPARQL_JSON
 from services.log_utils.log import log_message
 
 from services.shape_generation import generate_shape
+from services.category_linking import _fetch_categories_for_topic
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 
 
@@ -103,37 +104,7 @@ def dbpedia_categories_tool(topic: str) -> list:
     Use this when a question is about group membership and structured ontology triples are insufficient.
     Returns a list of matching category URIs that can be used as: ?uri dct:subject <category_uri>
     """
-    dbpedia_url = os.getenv("DBPEDIA_SPARQL_URL", "https://dbpedia.org/sparql")
-    search_term = topic.lower().replace(" ", "_")
-    query = f"""
-PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-PREFIX dbc: <http://dbpedia.org/resource/Category:>
-
-SELECT DISTINCT ?cat ?label WHERE {{
-  ?cat a skos:Concept ;
-       rdfs:label ?label .
-  FILTER(STRSTARTS(STR(?cat), "http://dbpedia.org/resource/Category:"))
-  FILTER(CONTAINS(LCASE(STR(?cat)), "{search_term}"))
-}} LIMIT 10
-"""
-    try:
-        sparql = SPARQLWrapper(dbpedia_url)
-        sparql.setTimeout(10)
-        sparql.setQuery(query)
-        sparql.setReturnFormat(SPARQL_JSON)
-        result = sparql.query().convert()
-        categories = []
-        for binding in result.get("results", {}).get("bindings", []):
-            cat_uri = binding.get("cat", {}).get("value", "")
-            label = binding.get("label", {}).get("value", "")
-            if cat_uri:
-                categories.append({"uri": cat_uri, "label": label})
-        log_message(step_name="DBpedia categories", color="Cyan", messages=[f"Topic: {topic}", f"Found: {categories}"])
-        return categories
-    except Exception as e:
-        logging.warning(f"[dbpedia_categories_tool] Query failed for '{topic}': {e}")
-        return []
+    return _fetch_categories_for_topic(topic)
 
 
 def make_generate_shape_tool(llm):

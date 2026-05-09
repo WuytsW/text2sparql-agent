@@ -124,6 +124,16 @@ Return a comma-separated list in the exact format shown (e.g. dbo:capital -> dbo
 If none are relevant, return an empty string."""
 }
 
+category_selection_prompt = {
+    "en": """Given the question: "{nlq}", and the following DBpedia category URIs found:
+
+{categories}
+
+Select only the category URIs that are most likely relevant to answering the question.
+Return a comma-separated list of the full URIs (e.g. http://dbpedia.org/resource/Category:Foo, http://dbpedia.org/resource/Category:Bar).
+If none are relevant, return an empty string."""
+}
+
 class_instances_prompt = {
     "en": """Determine if the term "{label}" refers to a specific named entity or a general class/type of things.
 

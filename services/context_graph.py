@@ -14,24 +14,27 @@ class ContextState(TypedDict):
     failed_attempts: List[dict]   # [{entities, shape, reason}, ...]
     entities: List[str]
     entity_uris: List[dict]
+    categories: List[dict]        # [{"uri": str, "label": str}, ...]
     shape: str
     check_valid: bool
     check_reason: str
     accepted_shape: Optional[str]
     accepted_entity_uris: Optional[List[dict]]
+    accepted_categories: Optional[List[dict]]
     step_times: dict
 
 
-def make_context_graph(entities_llm, shapes_llm, check_llm, log_calls: bool = False) -> StateGraph:
+def make_context_graph(entities_llm, shapes_llm, check_llm, categories_llm=None, log_calls: bool = False) -> StateGraph:
     """
     Builds and compiles the context-generation LangGraph sub-graph.
 
-    Flow: extract → el → shape → check → (retry or END)
+    Flow: extract → el → dbc → shape → check → (retry or END)
     On check failure: retry up to 3 times passing failed_attempts back to extract.
     After 3 failures: accept the last shape unconditionally.
     """
     from services.entity_extraction import extract_entities
     from services.entity_linking import dbpedia_el
+    from services.category_linking import fetch_categories
     from services.shape_generation import generate_shape
     from services.llm_utils import make_shape_check_tool
 
@@ -62,6 +65,17 @@ def make_context_graph(entities_llm, shapes_llm, check_llm, log_calls: bool = Fa
         st = state["step_times"]
         st["el"].append(f"{time.perf_counter() - _t0:.2f}s")
         return {"entity_uris": entity_uris, "step_times": st}
+
+    def dbc_node(state: ContextState) -> dict:
+        _t0 = time.perf_counter()
+        try:
+            categories = fetch_categories(state["nlq"], state["entities"], llm=categories_llm)
+        except Exception as e:
+            logging.warning(f"[context_graph] category_linking failed: {e}")
+            categories = []
+        st = state["step_times"]
+        st["dbc"].append(f"{time.perf_counter() - _t0:.2f}s")
+        return {"categories": categories, "step_times": st}
 
     def shape_node(state: ContextState) -> dict:
         _t0 = time.perf_counter()
@@ -101,6 +115,7 @@ def make_context_graph(entities_llm, shapes_llm, check_llm, log_calls: bool = Fa
                 "check_reason": reason,
                 "accepted_shape": state["shape"],
                 "accepted_entity_uris": state["entity_uris"],
+                "accepted_categories": state["categories"],
                 "step_times": st,
             }
 
@@ -127,6 +142,7 @@ def make_context_graph(entities_llm, shapes_llm, check_llm, log_calls: bool = Fa
             )
             updates["accepted_shape"] = state["shape"]
             updates["accepted_entity_uris"] = state["entity_uris"]
+            updates["accepted_categories"] = state["categories"]
         return updates
 
     def check_router(state: ContextState) -> str:
@@ -137,12 +153,14 @@ def make_context_graph(entities_llm, shapes_llm, check_llm, log_calls: bool = Fa
     builder = StateGraph(ContextState)
     builder.add_node("extract_node", extract_node)
     builder.add_node("el_node", el_node)
+    builder.add_node("dbc_node", dbc_node)
     builder.add_node("shape_node", shape_node)
     builder.add_node("check_node", check_node)
 
     builder.set_entry_point("extract_node")
     builder.add_edge("extract_node", "el_node")
-    builder.add_edge("el_node", "shape_node")
+    builder.add_edge("el_node", "dbc_node")
+    builder.add_edge("dbc_node", "shape_node")
     builder.add_edge("shape_node", "check_node")
     builder.add_conditional_edges(
         "check_node",
