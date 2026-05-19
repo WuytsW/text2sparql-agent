@@ -7,7 +7,7 @@ def falcon_external(text: str):
     headers = {'Content-Type': 'application/json'}
     data = {'text': text}
     params = {'mode': 'long', 'db': '1'}
-    response = requests.post(url, headers=headers, json=data, params=params, timeout=5)
+    response = requests.post(url, headers=headers, json=data, params=params, timeout=10)
     return response.json()
 
 

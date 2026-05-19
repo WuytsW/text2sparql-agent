@@ -78,7 +78,7 @@ class LLMAgentDBpedia:
         # OpenRouter routes qwen models to Novita's /completions endpoint by default,
         # but Novita only supports /chat/completions for these models. Ignoring Novita
         # forces OpenRouter to pick a provider that handles chat completions correctly.
-        _or_kwargs = {"extra_body": {"provider": {"ignore": ["Novita"]}}}
+        _or_kwargs = {"extra_body": {"provider": {"ignore": ["Novita"], "require_parameters": True}}}
 
         self.llm_eat = ChatOpenAI(
             model=model_name,
@@ -316,7 +316,7 @@ class LLMAgentDBpedia:
             }
 
         except Exception as e:
-            logging.error(f"Error in generate_sparql: {e}")
+            logging.error(f"Error in generate_sparql: {e}", exc_info=True)
             return {
                 "translated_question": input_question,
                 "query": "SELECT ?s ?p ?o WHERE { ?s ?p ?o } LIMIT 1",

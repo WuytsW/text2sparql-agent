@@ -42,6 +42,13 @@ class LogLLMCallbackHandler(BaseCallbackHandler):
             messages=formatted.splitlines(),
         )
 
+    def on_llm_error(self, error, **kwargs):
+        log_message(
+            step_name=f"LLM API error #{self.call_count}",
+            color="Red",
+            messages=[str(error)],
+        )
+
     def on_llm_end(self, response, **kwargs):
         if not self._enabled:
             return
