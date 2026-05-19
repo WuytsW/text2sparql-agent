@@ -8,8 +8,8 @@ def falcon_external(text: str):
     url = 'https://labs.tib.eu/falcon/falcon2/api'
     headers = {'Content-Type': 'application/json'}
     data = {'text': text}
-    params = {'mode': 'long', 'db': '1'}
-    response = requests.post(url, headers=headers, json=data, params=params, timeout=15)
+    params = {'mode': 'short', 'db': '1'}
+    response = requests.post(url, headers=headers, json=data, params=params, timeout=60)
     return response.json()
 
 
@@ -41,7 +41,7 @@ SELECT DISTINCT ?entity WHERE {{
     return [{entity_name: b["entity"]["value"]} for b in bindings]
 
 
-def dbpedia_el(nlq: str, ne_list: list) -> list:
+def dbpedia_el_sparql(nlq: str, ne_list: list) -> list:
     """Performs entity linking to DBpedia via SPARQL label lookup.
     Returns list of dict with linking candidates: [{"label": "URI"}]"""
     seen = set()
@@ -57,7 +57,7 @@ def dbpedia_el(nlq: str, ne_list: list) -> list:
     return nel_list
 
 
-def dbpedia_el_falcon(nlq: str, ne_list: list) -> list:
+def dbpedia_el(nlq: str, ne_list: list) -> list:
     """Performs entity linking to DBpedia using both the full question and individual named entities.
     Returns list of dict with linking candidates: [{"label": "URI"}]"""
     seen = set()
