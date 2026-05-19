@@ -22,7 +22,15 @@ class LogLLMCallbackHandler(BaseCallbackHandler):
         lines = []
         for grp in msgs:
             for m in grp:
-                content = m["content"].replace("\n", " ").strip()
+                content = (m["content"] or "").replace("\n", " ").strip()
+                for tc in m.get("tool_calls") or []:
+                    fn = tc.get("function", {})
+                    args_raw = fn.get("arguments", "")
+                    try:
+                        args_str = json.dumps(json.loads(args_raw), ensure_ascii=False)
+                    except Exception:
+                        args_str = args_raw
+                    content += f" [tool_call → {fn.get('name', '?')}({args_str[:400]})]"
                 if len(content) > 5000:
                     content = content[:5000] + "..."
                 lines.append(f"  [{m['type'].upper()}]: {content}")
@@ -33,7 +41,15 @@ class LogLLMCallbackHandler(BaseCallbackHandler):
         if not self._enabled:
             return
         model = serialized.get("kwargs", {}).get("model_name", "unknown")
-        msgs = [[{"type": m.type, "content": m.content} for m in grp] for grp in _messages]
+
+        def _msg_dict(m):
+            d = {"type": m.type, "content": m.content}
+            tc = getattr(m, "tool_calls", None) or m.additional_kwargs.get("tool_calls", [])
+            if tc:
+                d["tool_calls"] = tc
+            return d
+
+        msgs = [[_msg_dict(m) for m in grp] for grp in _messages]
         self._log_entries.append({"call": self.call_count, "model": model, "messages": msgs})
         formatted = self._format_messages(msgs)
         log_message(
@@ -54,11 +70,22 @@ class LogLLMCallbackHandler(BaseCallbackHandler):
             return
         gen = response.generations[0][0]
         text = gen.text or (gen.message.content if hasattr(gen, "message") else "")
+        tool_calls = []
+        if hasattr(gen, "message"):
+            tool_calls = gen.message.additional_kwargs.get("tool_calls", [])
         if text:
             if self._log_entries:
                 self._log_entries[-1]["response"] = text
+            log_message(step_name=f"LLM response #{self.call_count}", color="Magenta", messages=text.splitlines())
+        for tc in tool_calls:
+            fn = tc.get("function", {})
+            args_raw = fn.get("arguments", "")
+            try:
+                args_str = json.dumps(json.loads(args_raw), ensure_ascii=False)
+            except Exception:
+                args_str = args_raw
             log_message(
-                step_name=f"LLM response #{self.call_count}",
+                step_name=f"LLM tool_call #{self.call_count}",
                 color="Magenta",
-                messages=text.splitlines(),
+                messages=[f"{fn.get('name', '?')}: {args_str[:500]}"],
             )

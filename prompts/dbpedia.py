@@ -155,7 +155,7 @@ Query:
 Execution result:
 {execution_result}
 
-If results are non-empty (and answer the question (Do not be strict here, most often if the result is non-empty it is acceptable)) respond with exactly (JSON only, no markdown):
+If results are non-empty, or the result is a boolean ({{"boolean": true}} or {{"boolean": false}}) which is a valid ASK answer, and the result answers the question (do not be strict — a non-empty result is usually acceptable), respond with exactly (JSON only, no markdown):
 {{"ok": true}}
 
 If results are empty, an error, or do not answer the question respond with (JSON only, no markdown):
@@ -166,14 +166,20 @@ sparql_agent_prompt = {
     "en": """You are a SPARQL query generation agent for DBpedia.
 The conversation history contains the entity URIs, DBpedia shape, and categories needed to answer the question.
 
-Workflow:
-1. Generate a SPARQL query for the question using the context provided.
-2. Call execute_sparql with that query.
-3. If results are non-empty and answer the question, output the final query and stop.
-4. If results are empty, an error, or clearly wrong, refine the query and call execute_sparql again.
-5. Repeat up to 3 times. After 3 attempts, output the best query you have.
+IMPORTANT: You MUST call execute_sparql before producing any output. Never output a query without first executing it. Your very first action must be a call to execute_sparql.
 
-Generation rules:
+The tool returns two fields:
+  [Query]: the SPARQL query that was executed
+  [Result]: the execution result — a list of bindings, a boolean (for ASK queries), or an error
+
+Workflow:
+1. Call execute_sparql with your best SPARQL query for the question.
+2. Check [Result]:
+   - Non-empty list or a boolean value → the query worked. Output ONLY the plain SPARQL query from [Query] and stop.
+   - Empty list or error → call execute_sparql again with an improved query.
+3. Repeat up to 3 times total. After 3 attempts, output the query from [Query] of your best attempt.
+
+SPARQL generation rules:
 - Output only a plain SPARQL query. No markdown, no explanation, no code fences.
 - Use ASK for yes/no questions ("Are there any...", "Is X the Y of Z?"). Use SELECT for all others.
 - If the answer is a date, cast it: BIND(xsd:date(STR(?raw)) AS ?date)
@@ -183,8 +189,6 @@ Generation rules:
   Use categories as an alternative or fallback when structured dbo:/dbp: properties don't return results.
 - UNION must be wrapped inside the WHERE clause: SELECT ?uri WHERE {{ {{ ... }} UNION {{ ... }} }}
 - Do NOT use SERVICE wikibase:label
-
-Evaluation: Accept a query if results are non-empty and answer the question. Do not be strict — a non-empty result is usually acceptable. If results are empty or an error, improve the query based on the shape and context.
 
 Output only the final plain SPARQL query string. No markdown, no code fences, no explanation."""
 }

@@ -11,7 +11,30 @@ def falcon_external(text: str):
     return response.json()
 
 
-def dbpedia_el(nlq: str, ne_list: list) -> list:
+def spotlight_external(text: str, confidence: float = 0.35) -> dict:
+    url = 'https://api.dbpedia-spotlight.org/en/annotate'
+    headers = {'Accept': 'application/json'}
+    data = {'text': text, 'confidence': confidence}
+    response = requests.post(url, headers=headers, data=data, timeout=15)
+    response.raise_for_status()
+    return response.json()
+
+
+def dbpedia_el(nlq: str, _ne_list: list) -> list:
+    """Performs entity linking to DBpedia via DBpedia Spotlight.
+    Returns list of dict with linking candidates: [{"surfaceForm": "URI"}]"""
+    result = spotlight_external(nlq)
+    seen = set()
+    nel_list = []
+    for resource in result.get("Resources", []):
+        uri = resource.get("@URI")
+        label = resource.get("@surfaceForm", uri)
+        if uri and uri not in seen:
+            seen.add(uri)
+            nel_list.append({label: uri})
+    return nel_list
+
+def dbpedia_el_falcon(nlq: str, ne_list: list) -> list:
     """Performs entity linking to DBpedia using both the full question and individual named entities.
     Returns list of dict with linking candidates: [{"label": "URI"}]"""
     seen = set()

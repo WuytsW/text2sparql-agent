@@ -21,22 +21,25 @@ class ExecuteSPARQLInput(BaseModel):
     query: str = Field(description="The SPARQL query string to execute against DBpedia")
 
 
-def make_sparql_agent(generation_llm, sparql_endpoint: str, lang: str = "en") -> AgentExecutor:
+def make_sparql_agent(generation_llm, sparql_endpoint: str, lang: str = "en"):
     @tool("execute_sparql", args_schema=ExecuteSPARQLInput)
     def execute_sparql(query: str) -> str:
-        """Execute a SPARQL query against DBpedia. Returns the first 3 result bindings as JSON, or an error."""
+        """Execute a SPARQL query against DBpedia. Returns [Query] and [Result] fields; result is bindings (first 3), boolean (ASK), or error."""
         log_message(step_name="execute_sparql called", color="Cyan", messages=[query])
         try:
             raw = execute(query=query, endpoint_url=sparql_endpoint)
             if isinstance(raw, dict) and "error" not in raw:
-                bindings = raw.get("results", {}).get("bindings", [])[:3]
-                result = json.dumps(bindings)
+                if "boolean" in raw:
+                    bindings_repr = json.dumps({"boolean": raw["boolean"]})
+                else:
+                    bindings_repr = json.dumps(raw.get("results", {}).get("bindings", [])[:3])
             else:
-                result = json.dumps(raw)
+                bindings_repr = json.dumps(raw)
         except Exception as e:
-            result = json.dumps({"error": str(e)})
-        log_message(step_name="execute_sparql result", color="Cyan", messages=[result])
-        return result
+            bindings_repr = json.dumps({"error": str(e)})
+        result_payload = f"[Query]: {query}\n[Result]: {bindings_repr}"
+        log_message(step_name="execute_sparql result", color="Cyan", messages=[result_payload])
+        return result_payload
 
     tools = [execute_sparql]
 
@@ -48,7 +51,21 @@ def make_sparql_agent(generation_llm, sparql_endpoint: str, lang: str = "en") ->
     ])
 
     agent = create_tool_calling_agent(generation_llm, tools, prompt)
-    return AgentExecutor(agent=agent, tools=tools, max_iterations=4, verbose=False)
+    executor = AgentExecutor(agent=agent, tools=tools, max_iterations=4, verbose=False)
+
+    class _GuardedExecutor:
+        """Wraps AgentExecutor to guarantee at least one execute_sparql call."""
+
+        def invoke(self, inputs: dict) -> dict:
+            result = executor.invoke(inputs)
+            if not result.get("intermediate_steps"):
+                # Agent skipped tool calls — force execution now so the result is verified
+                query = result.get("output", "").strip()
+                if query:
+                    execute_sparql.invoke({"query": query})
+            return result
+
+    return _GuardedExecutor()
 
 
 # ---------------------------------------------------------------------------
@@ -94,8 +111,10 @@ def make_sparql_graph(generation_llm, check_llm) -> StateGraph:
         try:
             raw = execute(query=query, endpoint_url=state["sparql_endpoint"])
             if isinstance(raw, dict) and "error" not in raw:
-                bindings = raw.get("results", {}).get("bindings", [])[:3]
-                exec_result = json.dumps(bindings)
+                if "boolean" in raw:
+                    exec_result = json.dumps({"boolean": raw["boolean"]})
+                else:
+                    exec_result = json.dumps(raw.get("results", {}).get("bindings", [])[:3])
             else:
                 exec_result = json.dumps(raw)
         except Exception as e:
