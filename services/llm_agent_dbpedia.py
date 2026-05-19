@@ -19,7 +19,7 @@ from services.llm_utils import (
     correct_query_prefixes,
 )
 from services.context_graph import make_context_graph
-from services.sparql_graph import make_sparql_graph
+from services.sparql_graph import make_sparql_agent, make_sparql_graph
 from services.ld_utils import post_process
 from model.agent import PlanExecute
 from prompts.dbpedia import system_prompt
@@ -151,7 +151,8 @@ class LLMAgentDBpedia:
             categories_llm=self.categories_llm, log_calls=log_calls
         )
 
-        self._sparql_graph = make_sparql_graph(self.llm_execution_original, self.check_llm)
+        self._sparql_graph = make_sparql_agent(self.llm_execution_original, self.sparql_endpoint, self.lang)
+        # self._sparql_graph = make_sparql_graph(self.llm_execution_original, self.check_llm)
 
         self.app = None  # reset workflow on model change
         self.current_model = model_name
@@ -214,18 +215,25 @@ class LLMAgentDBpedia:
 
     def _sparql_loop_step(self, state: PlanExecute):
         _t0 = time.perf_counter()
+        # Agent invoke (make_sparql_agent)
         result = self._sparql_graph.invoke({
             "question": state["input"],
             "chat_history": state["chat_history"],
-            "sparql_endpoint": self.sparql_endpoint,
-            "lang": self.lang,
-            "query": "",
-            "exec_result": "",
-            "check_ok": False,
-            "suggestions": "",
-            "attempt_count": 0,
         })
-        final_query = result.get("query", "")
+        final_query = result.get("output", "")
+        # Graph invoke (make_sparql_graph)
+        # result = self._sparql_graph.invoke({
+        #     "question": state["input"],
+        #     "chat_history": state["chat_history"],
+        #     "sparql_endpoint": self.sparql_endpoint,
+        #     "lang": self.lang,
+        #     "query": "",
+        #     "exec_result": "",
+        #     "check_ok": False,
+        #     "suggestions": "",
+        #     "attempt_count": 0,
+        # })
+        # final_query = result.get("query", "")
         log_message(step_name="SPARQL loop result", color="Yellow", messages=[final_query])
         self._step_times.append(f"sparql_loop: {time.perf_counter() - _t0:.2f}s")
         return {"chat_history": state["chat_history"] + [AIMessage(final_query)]}

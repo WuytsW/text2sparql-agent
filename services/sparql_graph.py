@@ -1,13 +1,59 @@
 import json
 from typing import TypedDict
 
+from langchain.tools import tool
+from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.messages import HumanMessage
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langgraph.graph import StateGraph, END
+from pydantic import BaseModel, Field
 
 from services.ld_utils import execute
 from services.log_utils.log import log_message
-from prompts.dbpedia import generation_prompt, check_result_prompt
+from prompts.dbpedia import generation_prompt, check_result_prompt, sparql_agent_prompt
 
+
+# ---------------------------------------------------------------------------
+# Tool-calling agent
+# ---------------------------------------------------------------------------
+
+class ExecuteSPARQLInput(BaseModel):
+    query: str = Field(description="The SPARQL query string to execute against DBpedia")
+
+
+def make_sparql_agent(generation_llm, sparql_endpoint: str, lang: str = "en") -> AgentExecutor:
+    @tool("execute_sparql", args_schema=ExecuteSPARQLInput)
+    def execute_sparql(query: str) -> str:
+        """Execute a SPARQL query against DBpedia. Returns the first 3 result bindings as JSON, or an error."""
+        log_message(step_name="execute_sparql called", color="Cyan", messages=[query])
+        try:
+            raw = execute(query=query, endpoint_url=sparql_endpoint)
+            if isinstance(raw, dict) and "error" not in raw:
+                bindings = raw.get("results", {}).get("bindings", [])[:3]
+                result = json.dumps(bindings)
+            else:
+                result = json.dumps(raw)
+        except Exception as e:
+            result = json.dumps({"error": str(e)})
+        log_message(step_name="execute_sparql result", color="Cyan", messages=[result])
+        return result
+
+    tools = [execute_sparql]
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", sparql_agent_prompt[lang]),
+        MessagesPlaceholder("chat_history"),
+        ("human", "{question}"),
+        MessagesPlaceholder("agent_scratchpad"),
+    ])
+
+    agent = create_tool_calling_agent(generation_llm, tools, prompt)
+    return AgentExecutor(agent=agent, tools=tools, max_iterations=4, verbose=False)
+
+
+# ---------------------------------------------------------------------------
+# StateGraph (original)
+# ---------------------------------------------------------------------------
 
 class SparqlLoopState(TypedDict):
     question: str
