@@ -2,7 +2,6 @@ from fastapi import FastAPI, HTTPException
 from typing import List
 # from services.llm_agent import LLMAgent
 from services.llm_agent_dbpedia import LLMAgentDBpedia
-from services.llm_agent_corporate import LLMAgentCorporate
 
 
 __version__ = "0.1.0"
@@ -15,11 +14,9 @@ app = FastAPI(
 
 KNOWN_DATASETS: List[str] = [
     "https://dbpedia.org/sparql",
-    "https://text2sparql.aksw.org/2025/corporate/"
 ]
 
 dbpedia_agent = LLMAgentDBpedia()
-#corporate_agent = LLMAgentCorporate()
 
 @app.get("/api")
 async def get_answer(
@@ -46,8 +43,6 @@ async def get_answer(
 
     if "dbpedia" in dataset:
         result = dbpedia_agent.generate_sparql(question, model_name=model_name, log_calls=log_calls, shape_step=shape_step)
-    #elif "corporate" in dataset:
-       # result = corporate_agent.generate_sparql(question, model_name=model_name, compact=compact)
     else:
         raise HTTPException(status_code=404, detail="Unknown dataset. Please use one of the known datasets.")
           
