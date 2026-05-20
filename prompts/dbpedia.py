@@ -4,18 +4,18 @@ system_prompt = {
 }
 
 
-shape_selection_prompt = {
-    "en": """Given the folowing question: "{nlq}", and the following shape: "{shape}"
-    select the most relevant properties and classes from the shape that are likely to be useful for answering the question.
-    Return a comma-separated list of properties and classes from the shape that are relevant to the question. Only select properties and classes that are likely to be useful for answering the question. Do not select all properties, only the most relevant ones.
-    Keep the formatting of the properties and classes as they are in the shape (Example:  dbo:deathPlace -> dbo:Place). 
-    If the shape is empty, return an empty string."""
+entity_profile_selection_prompt = {
+    "en": """Given the folowing question: "{nlq}", and the following entity profile: "{entity_profile}"
+    select the most relevant properties and classes from the entity profile that are likely to be useful for answering the question.
+    Return a comma-separated list of properties and classes from the entity profile that are relevant to the question. Only select properties and classes that are likely to be useful for answering the question. Do not select all properties, only the most relevant ones.
+    Keep the formatting of the properties and classes as they are in the entity profile (Example:  dbo:deathPlace -> dbo:Place).
+    If the entity profile is empty, return an empty string."""
 }
 
-shape_selection_prompt_per_entity = {
+entity_profile_selection_prompt_per_entity = {
     "en": """Given the question: "{nlq}", and the following properties for "{label}":
 
-{shape}
+{entity_profile}
 
 Select only the most relevant properties needed to answer the question. (If you are not sure about selecting a property, it's better to include it than to miss it. Altough, try to avoid including too many irrelevant properties as it may lead to slow query execution or empty results.)
 Return a comma-separated list in the exact format shown (e.g. dbo:capital -> dbo:City).
@@ -67,10 +67,10 @@ Entity URIs (linked DBpedia resources):
 DBpedia categories:
 {categories}
 
-Shape (available properties per entity/class):
-{shape}
+Entity Profile (available properties per entity/class):
+{entity_profile}
 
-Evaluate the context AS A WHOLE. It is USEFUL if any part of it — the shape, the entity URIs, or the categories — provides information that could plausibly help construct a SPARQL query to answer the question. Individual components may be empty or sparse; that is fine as long as the overall context is helpful.
+Evaluate the context AS A WHOLE. It is USEFUL if any part of it — the entity profile, the entity URIs, or the categories — provides information that could plausibly help construct a SPARQL query to answer the question. Individual components may be empty or sparse; that is fine as long as the overall context is helpful.
 
 It is NOT USEFUL only if the context as a whole is clearly off-topic, completely empty, or the extracted entities are so wrong that no part of the context relates to the question.
 
@@ -117,7 +117,7 @@ Result: Museum, London
 
 sparql_planner_prompt = {
     "en": """You are a SPARQL query generation orchestrator for DBpedia.
-The context (entity URIs, DBpedia shape, categories) has already been provided in the conversation history.
+The context (entity URIs, DBpedia entity profile, categories) has already been provided in the conversation history.
 
 Follow this exact workflow:
 1. Call generate_sparql with no suggestions on the first attempt.
@@ -146,12 +146,12 @@ If results are non-empty, or the result is a boolean ({{"boolean": true}} or {{"
 {{"ok": true}}
 
 If results are empty, an error, or do not answer the question respond with (JSON only, no markdown):
-{{"ok": false, "suggestions": "<concrete fix suggestions based on the shape and context in the conversation>"}}"""
+{{"ok": false, "suggestions": "<concrete fix suggestions based on the entity profile and context in the conversation>"}}"""
 }
 
 _sparql_rules = """SPARQL generation rules:
 - Output only a plain SPARQL query. No markdown, no explanation, no code fences.
-- CRITICAL: Use the EXACT prefix shown in the shape for each property — do not substitute dbo: for dbp: or vice versa. The in-context examples above may use different prefixes for the same property; ignore those choices. The shape in this conversation is authoritative.
+- CRITICAL: Use the EXACT prefix shown in the entity profile for each property — do not substitute dbo: for dbp: or vice versa. The in-context examples above may use different prefixes for the same property; ignore those choices. The entity profile in this conversation is authoritative.
 - If the answer is a date, cast it: BIND(xsd:date(STR(?raw)) AS ?date)
 - For a list of things, use a single ?uri column. Merge related answers with UNION, not multiple SELECT variables.
 - DBpedia Categories (dbc:) in the context can be used via: ?uri dct:subject dbc:CategoryName
@@ -160,7 +160,7 @@ _sparql_rules = """SPARQL generation rules:
 
 sparql_agent_prompt = {
     "en": f"""You are a SPARQL query generation agent for DBpedia.
-The conversation history contains the entity URIs, DBpedia shape, and categories needed to answer the question.
+The conversation history contains the entity URIs, DBpedia entity profile, and categories needed to answer the question.
 
 IMPORTANT: You MUST call execute_sparql before producing any output. Never output a query without first executing it. Your very first action must be a call to execute_sparql.
 
@@ -182,7 +182,7 @@ Output only the final plain SPARQL query string. No markdown, no code fences, no
 
 
 generation_prompt = {
-    "en": f"""Using the context provided above (entity URIs, shape, categories), generate a SPARQL query to answer the following question.
+    "en": f"""Using the context provided above (entity URIs, entity profile, categories), generate a SPARQL query to answer the following question.
 
 Question: {{question}}
 {{suggestions_block}}

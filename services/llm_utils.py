@@ -12,7 +12,7 @@ from langchain.tools import tool
 from SPARQLWrapper import SPARQLWrapper, JSON as SPARQL_JSON
 from services.log_utils.log import log_message
 
-from services.context_utils.shape_generation_dbpedia import generate_shape
+from services.context_utils.entity_profile_generation_dbpedia import generate_entity_profile
 from services.context_utils.category_linking import _fetch_categories_for_topic
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 
@@ -51,10 +51,10 @@ class DBpediaELInput(BaseModel):
 class RELInput(BaseModel):
     rel_list: list = Field(description="should be a list of relations (strings) to be linked to the Knowledge Graph  URIs")
 
-class ShapeInput(BaseModel):
+class EntityProfileInput(BaseModel):
     nlq: str = Field(description="The user's natural language question")
     entity_labels: list[str] = Field(
-        description="List of DBpedia class or entity labels to generate shapes for, e.g. ['Germany'] or ['Scientist']"
+        description="List of DBpedia class or entity labels to generate entity profiles for, e.g. ['Germany'] or ['Scientist']"
     )
 
 class EntityExtractionInput(BaseModel):
@@ -86,7 +86,7 @@ def make_extract_entities_tool(llm):
         """
         Extract named entities and classes from a natural language question.
         Returns a list of entity/class label strings (e.g. ['Germany', 'Scientist']).
-        Call this before generate_shape_tool to determine which entities to generate shapes for.
+        Call this before generate_entity_profile_tool to determine which entities to generate profiles for.
         """
         return extract_entities(nlq, llm)
 
@@ -107,24 +107,24 @@ def dbpedia_categories_tool(topic: str) -> list:
     return _fetch_categories_for_topic(topic)
 
 
-def make_generate_shape_tool(llm):
-    """Factory that returns a generate_shape_tool bound to the given LLM."""
+def make_generate_entity_profile_tool(llm):
+    """Factory that returns a generate_entity_profile_tool bound to the given LLM."""
 
-    @tool("generate_shape_tool", args_schema=ShapeInput)
-    def generate_shape_tool(nlq: str, entity_labels: list[str]) -> str:
+    @tool("generate_entity_profile_tool", args_schema=EntityProfileInput)
+    def generate_entity_profile_tool(nlq: str, entity_labels: list[str]) -> str:
         """
-        Generate a DBpedia-oriented shape description for the given entity/class labels.
+        Generate a DBpedia-oriented entity profile for the given entity/class labels.
         Returns a text block with relevant properties and, when possible, controlled values.
         """
-        result = generate_shape(
+        result = generate_entity_profile(
             nlq=nlq,
             entity_labels=entity_labels,
-            shapes_llm=llm,
+            profile_llm=llm,
         )
 
-        return result or "No shape could be generated."
+        return result or "No entity profile could be generated."
 
-    return generate_shape_tool
+    return generate_entity_profile_tool
 
 
 class EntityLinkingInput(BaseModel):
@@ -182,7 +182,7 @@ class ContextCheckInput(BaseModel):
     entities: list = Field(description="Extracted entity/class labels")
     entity_uris: list = Field(description="Linked DBpedia URIs for the entities")
     categories: list = Field(description="DBpedia category URIs and labels")
-    shape: str = Field(description="The DBpedia shape text (available properties)")
+    entity_profile: str = Field(description="The DBpedia entity profile text (available properties)")
 
 
 def make_context_check_tool(llm, context_prompt=None):
@@ -192,9 +192,9 @@ def make_context_check_tool(llm, context_prompt=None):
         context_prompt = context_check_prompt
 
     @tool("context_check_tool", args_schema=ContextCheckInput)
-    def context_check_tool(nlq: str, entities: list, entity_uris: list, categories: list, shape: str) -> dict:
+    def context_check_tool(nlq: str, entities: list, entity_uris: list, categories: list, entity_profile: str) -> dict:
         """
-        Evaluates whether the full extracted context (entities, URIs, categories, shape) is useful for answering the question.
+        Evaluates whether the full extracted context (entities, URIs, categories, entity profile) is useful for answering the question.
         Returns a dict with 'valid' (bool) and 'reason' (str).
         """
         import json as _json
@@ -203,7 +203,7 @@ def make_context_check_tool(llm, context_prompt=None):
             entities=entities or [],
             entity_uris=entity_uris or [],
             categories=categories or [],
-            shape=shape or "(empty)",
+            entity_profile=entity_profile or "(empty)",
         )
         response = llm.invoke([{"role": "user", "content": prompt}])
         raw = response.content.strip()

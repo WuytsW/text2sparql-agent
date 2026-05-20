@@ -4,18 +4,18 @@ system_prompt = {
 }
 
 
-shape_selection_prompt = {
-    "en": """Given the following question: "{nlq}", and the following shape: "{shape}"
-    select the most relevant properties and classes from the shape that are likely to be useful for answering the question.
-    Return a comma-separated list of properties and classes from the shape that are relevant to the question. Only select properties and classes that are likely to be useful for answering the question. Do not select all properties, only the most relevant ones.
-    Keep the formatting of the properties as they are in the shape (Example: wdt:P17 -> IRI).
-    If the shape is empty, return an empty string."""
+entity_profile_selection_prompt = {
+    "en": """Given the following question: "{nlq}", and the following entity profile: "{entity_profile}"
+    select the most relevant properties and classes from the entity profile that are likely to be useful for answering the question.
+    Return a comma-separated list of properties and classes from the entity profile that are relevant to the question. Only select properties and classes that are likely to be useful for answering the question. Do not select all properties, only the most relevant ones.
+    Keep the formatting of the properties as they are in the entity profile (Example: wdt:P17 -> IRI).
+    If the entity profile is empty, return an empty string."""
 }
 
-shape_selection_prompt_per_entity = {
+entity_profile_selection_prompt_per_entity = {
     "en": """Given the question: "{nlq}", and the following properties for "{label}":
 
-{shape}
+{entity_profile}
 
 Select only the most relevant properties needed to answer the question. (If you are not sure about selecting a property, it's better to include it than to miss it. Although, try to avoid including too many irrelevant properties as it may lead to slow query execution or empty results.)
 Return a comma-separated list in the exact format shown (e.g. wdt:P17 -> IRI).
@@ -53,10 +53,10 @@ Extracted entities: {entities}
 Entity URIs (linked Wikidata resources):
 {entity_uris}
 
-Shape (available wdt: properties per entity/class):
-{shape}
+Entity Profile (available wdt: properties per entity/class):
+{entity_profile}
 
-Evaluate the context AS A WHOLE. It is USEFUL if any part of it — the shape or the entity URIs — provides information that could plausibly help construct a SPARQL query to answer the question. Individual components may be empty or sparse; that is fine as long as the overall context is helpful.
+Evaluate the context AS A WHOLE. It is USEFUL if any part of it — the entity profile or the entity URIs — provides information that could plausibly help construct a SPARQL query to answer the question. Individual components may be empty or sparse; that is fine as long as the overall context is helpful.
 
 It is NOT USEFUL only if the context as a whole is clearly off-topic, completely empty, or the extracted entities are so wrong that no part of the context relates to the question.
 
@@ -97,7 +97,7 @@ Result: museum, Paris
 
 sparql_planner_prompt = {
     "en": """You are a SPARQL query generation orchestrator for Wikidata.
-The context (entity URIs, Wikidata shape) has already been provided in the conversation history.
+The context (entity URIs, Wikidata entity profile) has already been provided in the conversation history.
 
 Follow this exact workflow:
 1. Call generate_sparql with no suggestions on the first attempt.
@@ -125,7 +125,7 @@ If results are non-empty, or the result is a boolean ({{"boolean": true}} or {{"
 {{"ok": true}}
 
 If results are empty, an error, or do not answer the question respond with (JSON only, no markdown):
-{{"ok": false, "suggestions": "<concrete fix suggestions based on the shape and context in the conversation>"}}"""
+{{"ok": false, "suggestions": "<concrete fix suggestions based on the entity profile and context in the conversation>"}}"""
 }
 
 _sparql_rules = """SPARQL generation rules for Wikidata:
@@ -136,7 +136,7 @@ _sparql_rules = """SPARQL generation rules for Wikidata:
 - To retrieve human-readable labels, add at the end of the WHERE clause:
     SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en" . }}
   and use ?itemLabel, ?valueLabel etc. for display.
-- CRITICAL: Use the EXACT property shown in the shape — do not substitute wdt: for p: or vice versa.
+- CRITICAL: Use the EXACT property shown in the entity profile — do not substitute wdt: for p: or vice versa.
 - If the answer is a date, it is already typed as xsd:dateTime in Wikidata; cast if needed: BIND(xsd:date(STR(?raw)) AS ?date)
 - For a list of things, use a single ?item or ?itemLabel column.
 - UNION must be wrapped inside the WHERE clause: SELECT ?item WHERE {{ {{ ... }} UNION {{ ... }} }}
@@ -144,7 +144,7 @@ _sparql_rules = """SPARQL generation rules for Wikidata:
 
 sparql_agent_prompt = {
     "en": f"""You are a SPARQL query generation agent for Wikidata.
-The conversation history contains the entity URIs and Wikidata shape needed to answer the question.
+The conversation history contains the entity URIs and Wikidata entity profile needed to answer the question.
 
 IMPORTANT: You MUST call execute_sparql before producing any output. Never output a query without first executing it. Your very first action must be a call to execute_sparql.
 
@@ -166,7 +166,7 @@ Output only the final plain SPARQL query string. No markdown, no code fences, no
 
 
 generation_prompt = {
-    "en": f"""Using the context provided above (entity URIs and shape), generate a SPARQL query to answer the following question.
+    "en": f"""Using the context provided above (entity URIs and entity profile), generate a SPARQL query to answer the following question.
 
 Question: {{question}}
 {{suggestions_block}}

@@ -2,7 +2,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
-from prompts.wikidata import shape_selection_prompt_per_entity, class_instances_prompt
+from prompts.wikidata import entity_profile_selection_prompt_per_entity, class_instances_prompt
 from services.log_utils import log_message, log_warning
 from SPARQLWrapper import SPARQLWrapper, JSON
 
@@ -38,7 +38,7 @@ def _run_sparql_wikidata(query: str, endpoint: str, timeout: int = 30) -> list:
         result = sparql.query().convert()
         return result.get("results", {}).get("bindings", [])
     except Exception as e:
-        log_warning("shape_generation_wikidata", str(e))
+        log_warning("entity_profile_generation_wikidata", str(e))
         return []
 
 
@@ -67,7 +67,7 @@ LIMIT 150
             range_short = _shorten_wdt_uri(dt) if dt else "xsd:string"
         items.append(f"{prop_short} -> {range_short}")
     if log_calls:
-        log_message("shape_gen_entity_wikidata", "Cyan", [qid, str(len(items))])
+        log_message("entity_profile_gen_entity_wikidata", "Cyan", [qid, str(len(items))])
     return items
 
 
@@ -97,7 +97,7 @@ LIMIT 100
             range_short = _shorten_wdt_uri(dt) if dt else "xsd:string"
         items.append(f"{prop_short} -> {range_short}")
     if log_calls:
-        log_message("shape_gen_class_wikidata", "Cyan", [qid, str(len(items))])
+        log_message("entity_profile_gen_class_wikidata", "Cyan", [qid, str(len(items))])
     return items
 
 
@@ -108,14 +108,14 @@ def _llm_classify(label: str, llm) -> bool:
     return response.content.strip().startswith("CLASS")
 
 
-def _select_relevant_shape_parts(nlq: str, shape: str, llm, label: str) -> list:
-    prompt = shape_selection_prompt_per_entity["en"].format(nlq=nlq, label=label, shape=shape)
+def _select_relevant_entity_profile_parts(nlq: str, entity_profile: str, llm, label: str) -> list:
+    prompt = entity_profile_selection_prompt_per_entity["en"].format(nlq=nlq, label=label, entity_profile=entity_profile)
     response = llm.invoke([HumanMessage(content=prompt)])
     return [i.strip() for i in response.content.strip().split(",") if i.strip()]
 
 
-def _process_entity_wikidata(label: str, qid: str, nlq: str, shapes_llm, endpoint: str, log_calls: bool = False) -> str:
-    is_class = _llm_classify(label, shapes_llm)
+def _process_entity_wikidata(label: str, qid: str, nlq: str, profile_llm, endpoint: str, log_calls: bool = False) -> str:
+    is_class = _llm_classify(label, profile_llm)
     if is_class:
         items = _run_sparql_for_class_wikidata(qid, endpoint, log_calls=log_calls)
     else:
@@ -123,16 +123,16 @@ def _process_entity_wikidata(label: str, qid: str, nlq: str, shapes_llm, endpoin
 
     if not items:
         return ""
-    if shapes_llm and len(items) > _MAX_PROPS_WITHOUT_FILTER:
-        items = _select_relevant_shape_parts(nlq, "\n".join(items), shapes_llm, label=label)
+    if profile_llm and len(items) > _MAX_PROPS_WITHOUT_FILTER:
+        items = _select_relevant_entity_profile_parts(nlq, "\n".join(items), profile_llm, label=label)
     if not items:
         return ""
     indented = "\n".join(f"  {line}" for line in items)
     return f"{label}:\n{indented}"
 
 
-def generate_shape_wikidata(nlq: str, entity_uris: list, shapes_llm, log_calls: bool = False) -> str:
-    """Generate a Wikidata property shape for the given linked entity URIs.
+def generate_entity_profile_wikidata(nlq: str, entity_uris: list, profile_llm, log_calls: bool = False) -> str:
+    """Generate a Wikidata entity profile for the given linked entity URIs.
 
     entity_uris: [{label: "http://www.wikidata.org/entity/QID"}, ...]
     Returns a multi-section string with wdt: properties per entity.
@@ -159,12 +159,12 @@ def generate_shape_wikidata(nlq: str, entity_uris: list, shapes_llm, log_calls: 
     try:
         with ThreadPoolExecutor() as executor:
             results = list(executor.map(
-                lambda t: _process_entity_wikidata(t[0], t[1], nlq, shapes_llm, endpoint, log_calls=log_calls),
+                lambda t: _process_entity_wikidata(t[0], t[1], nlq, profile_llm, endpoint, log_calls=log_calls),
                 tasks
             ))
         sections = [s for s in results if s]
     except Exception as e:
-        log_warning("generate_shape_wikidata", str(e))
+        log_warning("generate_entity_profile_wikidata", str(e))
         return None
 
     return "\n".join(sections) if sections else None

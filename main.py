@@ -26,7 +26,7 @@ async def get_answer(
     dataset: str,
     model_name: str = "openai/gpt-4o-mini",
     log_calls: bool = True,
-    shape_step: bool = True
+    entity_profile_step: bool = True
 ):
     """
     Process a natural language question and convert it to SPARQL query for the specified dataset.
@@ -44,9 +44,9 @@ async def get_answer(
         raise HTTPException(status_code=404, detail="Unknown dataset. Please use one of the known datasets.")
 
     if "dbpedia" in dataset:
-        result = dbpedia_agent.generate_sparql(question, model_name=model_name, log_calls=log_calls, shape_step=shape_step)
+        result = dbpedia_agent.generate_sparql(question, model_name=model_name, log_calls=log_calls, entity_profile_step=entity_profile_step)
     elif "wikidata" in dataset:
-        result = wikidata_agent.generate_sparql(question, model_name=model_name, log_calls=log_calls, shape_step=shape_step)
+        result = wikidata_agent.generate_sparql(question, model_name=model_name, log_calls=log_calls, entity_profile_step=entity_profile_step)
     else:
         raise HTTPException(status_code=404, detail="Unknown dataset. Please use one of the known datasets.")
           

@@ -106,7 +106,7 @@ class LLMAgentDBpedia:
             callbacks=[self.log_handler]
         )
 
-        self.shapes_llm = ChatOpenAI(
+        self.profile_llm = ChatOpenAI(
             model=model_name,
             api_key=os.getenv("mKGQAgent_Shapes_LLM"),
             base_url="https://openrouter.ai/api/v1",
@@ -122,7 +122,7 @@ class LLMAgentDBpedia:
             callbacks=[self.log_handler]
         )
 
-        self.shape_check_llm = ChatOpenAI(
+        self.profile_check_llm = ChatOpenAI(
             model=model_name,
             api_key=os.getenv("mKGQAgent_Context_LLM", os.getenv("mKGQAgent_Execution_original_LLM")),
             base_url="https://openrouter.ai/api/v1",
@@ -147,7 +147,7 @@ class LLMAgentDBpedia:
         )
 
         self._context_graph = make_context_graph(
-            self.entities_llm, self.shapes_llm, self.shape_check_llm,
+            self.entities_llm, self.profile_llm, self.profile_check_llm,
             categories_llm=self.categories_llm, log_calls=log_calls
         )
 
@@ -189,30 +189,30 @@ class LLMAgentDBpedia:
             "entities": [],
             "entity_uris": [],
             "categories": [],
-            "shape": "",
+            "entity_profile": "",
             "check_valid": False,
             "check_reason": "",
-            "accepted_shape": None,
+            "accepted_entity_profile": None,
             "accepted_entity_uris": None,
             "accepted_categories": None,
-            "step_times": {"extraction": [], "el": [], "dbc": [], "shape": [], "check": []},
+            "step_times": {"extraction": [], "el": [], "dbc": [], "entity_profile": [], "check": []},
         })
 
-        accepted_shape = result.get("accepted_shape") or result.get("shape") or "No shape generated."
+        accepted_entity_profile = result.get("accepted_entity_profile") or result.get("entity_profile") or "No entity profile generated."
         entity_uris = result.get("accepted_entity_uris") or result.get("entity_uris") or []
         categories = result.get("accepted_categories") or result.get("categories") or []
 
         annotated_lines = []
-        for line in accepted_shape.splitlines():
+        for line in accepted_entity_profile.splitlines():
             if line.lstrip().startswith("dbp:"):
                 annotated_lines.append(line + "  [USE dbp:, NOT dbo:]")
             else:
                 annotated_lines.append(line)
-        annotated_shape = "\n".join(annotated_lines)
+        annotated_entity_profile = "\n".join(annotated_lines)
 
         context_msg = (
             f"Entity URIs: {json.dumps(entity_uris)}\n"
-            f"Shape:\n{annotated_shape}"
+            f"Entity Profile:\n{annotated_entity_profile}"
         )
         if categories:
             cats_str = "\n".join(f"  {c['uri']}  ({c['label']})" for c in categories)
@@ -280,7 +280,7 @@ class LLMAgentDBpedia:
         log_message(step_name="Similar examples retrieved for ICL", color="Yellow", messages=[example])
         return example
 
-    def generate_sparql(self, input_question: str, model_name: str = "openai/gpt-4o-mini", log_calls: bool = True, shape_step: bool = True) -> dict:
+    def generate_sparql(self, input_question: str, model_name: str = "openai/gpt-4o-mini", log_calls: bool = True, entity_profile_step: bool = True) -> dict:
         """
         Convert a natural language question to a SPARQL query.
 
@@ -288,7 +288,7 @@ class LLMAgentDBpedia:
             input_question: The natural language question
             model_name: OpenRouter model identifier (e.g. "openai/gpt-4o-mini")
             log_calls: If True, log LLM calls
-            shape_step: Kept for API compatibility (shape generation is always active via generate_context_tool)
+            entity_profile_step: Kept for API compatibility (entity profile generation is always active via generate_context_tool)
 
         Returns:
             Dict with translated_question, query, prompt_tokens, completion_tokens, requests
@@ -310,9 +310,9 @@ class LLMAgentDBpedia:
                 translated_question = self._translate_step(input_question)
                 self._step_times.append(f"translation: {time.perf_counter() - _t0:.2f}s")
 
-                _t0 = time.perf_counter()
-                self._eat_step(chat_history, translated_question)
-                self._step_times.append(f"eat: {time.perf_counter() - _t0:.2f}s")
+                #_t0 = time.perf_counter()
+                #self._eat_step(chat_history, translated_question)
+                #self._step_times.append(f"eat: {time.perf_counter() - _t0:.2f}s")
 
                 _t0 = time.perf_counter()
                 self._get_similar_examples_step(chat_history, translated_question)
@@ -328,7 +328,7 @@ class LLMAgentDBpedia:
 
             sparql_result = result["chat_history"][-1].content
             generated_query = post_process(sparql_result)
-            # generated_query = correct_query_prefixes(generated_query, self.shape_check_llm)
+            # generated_query = correct_query_prefixes(generated_query, self.profile_check_llm)
             log_message(step_name="Generated SPARQL query", color="Green", messages=[generated_query])
 
             return {

@@ -27,7 +27,7 @@ from prompts.wikidata import system_prompt, sparql_agent_prompt, generation_prom
 class LLMAgentWikidata:
     """
     LLM agent that converts natural language to SPARQL over Wikidata.
-    Mirrors LLMAgentDBpedia but uses Wikidata entity linking, shape generation,
+    Mirrors LLMAgentDBpedia but uses Wikidata entity linking, entity profile generation,
     and rate-limit-safe SPARQL execution. No categories step.
     """
 
@@ -104,7 +104,7 @@ class LLMAgentWikidata:
             callbacks=[self.log_handler]
         )
 
-        self.shapes_llm = ChatOpenAI(
+        self.profile_llm = ChatOpenAI(
             model=model_name,
             api_key=os.getenv("mKGQAgent_Shapes_LLM"),
             base_url="https://openrouter.ai/api/v1",
@@ -120,7 +120,7 @@ class LLMAgentWikidata:
             callbacks=[self.log_handler]
         )
 
-        self.shape_check_llm = ChatOpenAI(
+        self.profile_check_llm = ChatOpenAI(
             model=model_name,
             api_key=os.getenv("mKGQAgent_Context_LLM", os.getenv("mKGQAgent_Execution_original_LLM")),
             base_url="https://openrouter.ai/api/v1",
@@ -137,7 +137,7 @@ class LLMAgentWikidata:
         )
 
         self._context_graph = make_context_graph_wikidata(
-            self.entities_llm, self.shapes_llm, self.shape_check_llm, log_calls=log_calls
+            self.entities_llm, self.profile_llm, self.profile_check_llm, log_calls=log_calls
         )
 
         self._sparql_agent = make_sparql_agent(
@@ -188,20 +188,20 @@ class LLMAgentWikidata:
             "failed_attempts": [],
             "entities": [],
             "entity_uris": [],
-            "shape": "",
+            "entity_profile": "",
             "check_valid": False,
             "check_reason": "",
-            "accepted_shape": None,
+            "accepted_entity_profile": None,
             "accepted_entity_uris": None,
-            "step_times": {"extraction": [], "el": [], "shape": [], "check": []},
+            "step_times": {"extraction": [], "el": [], "entity_profile": [], "check": []},
         })
 
-        accepted_shape = result.get("accepted_shape") or result.get("shape") or "No shape generated."
+        accepted_entity_profile = result.get("accepted_entity_profile") or result.get("entity_profile") or "No entity profile generated."
         entity_uris = result.get("accepted_entity_uris") or result.get("entity_uris") or []
 
         context_msg = (
             f"Entity URIs: {json.dumps(entity_uris)}\n"
-            f"Shape:\n{accepted_shape}"
+            f"Entity Profile:\n{accepted_entity_profile}"
         )
         log_message(step_name="Context generated", color="Yellow", messages=[context_msg])
         self._step_times.append({"context": result.get("step_times", {})})
@@ -261,7 +261,7 @@ class LLMAgentWikidata:
         log_message(step_name="Similar examples retrieved for ICL", color="Yellow", messages=[example])
         return example
 
-    def generate_sparql(self, input_question: str, model_name: str = "openai/gpt-4o-mini", log_calls: bool = True, shape_step: bool = True) -> dict:
+    def generate_sparql(self, input_question: str, model_name: str = "openai/gpt-4o-mini", log_calls: bool = True, entity_profile_step: bool = True) -> dict:
         """Convert a natural language question to a SPARQL query over Wikidata."""
         try:
             if model_name != self.current_model:

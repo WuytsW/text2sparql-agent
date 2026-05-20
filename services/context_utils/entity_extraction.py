@@ -11,7 +11,7 @@ load_dotenv(dotenv_path=".env")
 def extract_entities(question, llm, failed_attempts: list = None):
     """
     Extracts entities from the given question using an LLM.
-    failed_attempts: list of dicts [{entities, shape, reason}] from prior shape-check failures.
+    failed_attempts: list of dicts [{entities, entity_profile, reason}] from prior entity_profile-check failures.
     """
     user_prompt = entities_extraction_prompt["en"].format(nlq=question)
 
@@ -21,7 +21,7 @@ def extract_entities(question, llm, failed_attempts: list = None):
             for a in failed_attempts
         )
         user_prompt += (
-            f"\n\nPreviously tried entity labels that produced unhelpful shapes — "
+            f"\n\nPreviously tried entity labels that produced unhelpful entity profiles — "
             f"avoid these and try alternative labels:\n{retry_lines}"
         )
 

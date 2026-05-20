@@ -4,8 +4,8 @@ from concurrent.futures import ThreadPoolExecutor
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 from prompts.dbpedia import (
-    shape_selection_prompt,
-    shape_selection_prompt_per_entity,
+    entity_profile_selection_prompt,
+    entity_profile_selection_prompt_per_entity,
     class_instances_prompt,
 )
 from services.log_utils import log_message, log_warning
@@ -205,7 +205,7 @@ def _query_property_values(prop_prefixed: str, sparql_endpoint: str, log_calls: 
     return values
 
 
-def add_possible_values_to_shape(relevant_items: list, sparql_endpoint: str, log_calls: bool = False) -> str:
+def add_possible_values_to_entity_profile(relevant_items: list, sparql_endpoint: str, log_calls: bool = False) -> str:
     """
     For each prop -> range item, queries the A-Box for distinct values using
     cardinality filtering. Properties with few distinct values (controlled
@@ -241,7 +241,7 @@ def _llm_classify(label, llm):
     return response.content.strip().startswith("CLASS")
 
 
-def select_relevant_shape_parts(nlq: str, shape: str, llm, label: str = None) -> list:
+def select_relevant_entity_profile_parts(nlq: str, entity_profile: str, llm, label: str = None) -> list:
     """
     Uses an LLM to filter a newline-joined list of prop -> range items down to
     the ones most relevant for answering nlq. When label is provided, uses the
@@ -249,11 +249,11 @@ def select_relevant_shape_parts(nlq: str, shape: str, llm, label: str = None) ->
     Returns a list of stripped prop -> range strings.
     """
     if label:
-        prompt = shape_selection_prompt_per_entity["en"].format(
-            nlq=nlq, label=label, shape=shape
+        prompt = entity_profile_selection_prompt_per_entity["en"].format(
+            nlq=nlq, label=label, entity_profile=entity_profile
         )
     else:
-        prompt = shape_selection_prompt["en"].format(nlq=nlq, shape=shape)
+        prompt = entity_profile_selection_prompt["en"].format(nlq=nlq, entity_profile=entity_profile)
     response = llm.invoke([HumanMessage(content=prompt)])
     return [i.strip() for i in response.content.strip().split(",") if i.strip()]
 
@@ -334,10 +334,10 @@ def _process_entity_section(
     if not items:
         return ""
     if llm and len(items) > _MAX_PROPS_WITHOUT_FILTER:
-        items = select_relevant_shape_parts(nlq, "\n".join(items), llm, label=label_clean)
+        items = select_relevant_entity_profile_parts(nlq, "\n".join(items), llm, label=label_clean)
     if not items:
         return ""
-    enriched = add_possible_values_to_shape(items, endpoint, log_calls=log_calls)
+    enriched = add_possible_values_to_entity_profile(items, endpoint, log_calls=log_calls)
     if not enriched.strip():
         return ""
     indented = "\n".join(f"  {line}" for line in enriched.splitlines())
@@ -348,11 +348,11 @@ def _process_entity_section(
 # Public API
 # ---------------------------------------------------------------------------
 
-def _process_label(label: str, nlq: str, shapes_llm, endpoint: str, log_calls: bool = False) -> str:
+def _process_label(label: str, nlq: str, profile_llm, endpoint: str, log_calls: bool = False) -> str:
     label_clean = label.replace(" ", "_")
     label_clean = label_clean[0].upper() + label_clean[1:]
 
-    if _llm_classify(label_clean, shapes_llm):
+    if _llm_classify(label_clean, profile_llm):
         class_uri = f"http://dbpedia.org/ontology/{label_clean}"
         items = get_tbox_properties(class_uri, endpoint, log_calls=log_calls)
         # Also fetch raw Wikipedia infobox (dbp:) properties from A-box sample instances.
@@ -368,17 +368,17 @@ def _process_label(label: str, nlq: str, shapes_llm, endpoint: str, log_calls: b
     else:
         items = _run_sparql_for_entity(label_clean, endpoint, log_calls=log_calls)
 
-    return _process_entity_section(label_clean, items, nlq, shapes_llm, endpoint, log_calls=log_calls)
+    return _process_entity_section(label_clean, items, nlq, profile_llm, endpoint, log_calls=log_calls)
 
 
-def generate_shape(nlq: str, entity_labels: list, shapes_llm, log_calls: bool = False) -> str:
+def generate_entity_profile(nlq: str, entity_labels: list, profile_llm, log_calls: bool = False) -> str:
     load_dotenv(dotenv_path=".env")
     endpoint = os.getenv("DBPEDIA_SPARQL_URL")
 
     try:
         with ThreadPoolExecutor() as executor:
             results = list(executor.map(
-                lambda label: _process_label(label, nlq, shapes_llm, endpoint, log_calls=log_calls),
+                lambda label: _process_label(label, nlq, profile_llm, endpoint, log_calls=log_calls),
                 entity_labels
             ))
         sections = [s for s in results if s]
