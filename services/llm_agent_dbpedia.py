@@ -18,7 +18,7 @@ from services.llm_utils import (
     get_expected_answer_type,
     correct_query_prefixes,
 )
-from services.context_graph import make_context_graph
+from services.context_graph_dbpedia import make_context_graph
 from services.sparql_graph import make_sparql_agent, make_sparql_graph
 from services.ld_utils import post_process
 from model.agent import PlanExecute
@@ -202,9 +202,17 @@ class LLMAgentDBpedia:
         entity_uris = result.get("accepted_entity_uris") or result.get("entity_uris") or []
         categories = result.get("accepted_categories") or result.get("categories") or []
 
+        annotated_lines = []
+        for line in accepted_shape.splitlines():
+            if line.lstrip().startswith("dbp:"):
+                annotated_lines.append(line + "  [USE dbp:, NOT dbo:]")
+            else:
+                annotated_lines.append(line)
+        annotated_shape = "\n".join(annotated_lines)
+
         context_msg = (
             f"Entity URIs: {json.dumps(entity_uris)}\n"
-            f"Shape:\n{accepted_shape}"
+            f"Shape:\n{annotated_shape}"
         )
         if categories:
             cats_str = "\n".join(f"  {c['uri']}  ({c['label']})" for c in categories)
