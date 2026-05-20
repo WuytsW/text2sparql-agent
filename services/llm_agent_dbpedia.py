@@ -320,7 +320,7 @@ class LLMAgentDBpedia:
 
             sparql_result = result["chat_history"][-1].content
             generated_query = post_process(sparql_result)
-            generated_query = correct_query_prefixes(generated_query, self.shape_check_llm)
+            # generated_query = correct_query_prefixes(generated_query, self.shape_check_llm)
             log_message(step_name="Generated SPARQL query", color="Green", messages=[generated_query])
 
             return {
