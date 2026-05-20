@@ -130,22 +130,7 @@ Follow this exact workflow:
 Never skip execute_sparql after generating a query. Output only the final plain SPARQL query string, no markdown, no explanation."""
 }
 
-generation_prompt = {
-    "en": """Using the context provided above (entity URIs, shape, categories), generate a SPARQL query to answer the following question.
 
-Question: {question}
-{suggestions_block}
-Rules:
-- Output only a plain SPARQL query. No markdown, no explanation, no code fences.
-- Use ASK for yes/no questions ("Are there any...", "Is X the Y of Z?"). Use SELECT for all others.
-- If the answer is a date, cast it: BIND(xsd:date(STR(?raw)) AS ?date)
-- For a list of things, use a single ?uri column. Merge related answers with UNION, not multiple SELECT variables.
-- Use dbo: properties from the shape. Only use dbp: if the shape explicitly listed that property with a dbp: prefix.
-- DBpedia Categories (dbc:) in the context can be used via: ?uri dct:subject dbc:CategoryName
-  Use categories as an alternative or fallback when structured dbo:/dbp: properties don't return results, or when the question is about membership in a category.
-- UNION must be wrapped inside the WHERE clause: SELECT ?uri WHERE {{ {{ ... }} UNION {{ ... }} }}
-- Do NOT use SERVICE wikibase:label"""
-}
 
 check_result_prompt = {
     "en": """Evaluate whether this SPARQL query correctly answers the question.
@@ -164,8 +149,17 @@ If results are empty, an error, or do not answer the question respond with (JSON
 {{"ok": false, "suggestions": "<concrete fix suggestions based on the shape and context in the conversation>"}}"""
 }
 
+_sparql_rules = """SPARQL generation rules:
+- Output only a plain SPARQL query. No markdown, no explanation, no code fences.
+- CRITICAL: Use the EXACT prefix shown in the shape for each property — do not substitute dbo: for dbp: or vice versa. The in-context examples above may use different prefixes for the same property; ignore those choices. The shape in this conversation is authoritative.
+- If the answer is a date, cast it: BIND(xsd:date(STR(?raw)) AS ?date)
+- For a list of things, use a single ?uri column. Merge related answers with UNION, not multiple SELECT variables.
+- DBpedia Categories (dbc:) in the context can be used via: ?uri dct:subject dbc:CategoryName
+  Use categories as an alternative or fallback when structured dbo:/dbp: properties don't return results.
+- UNION must be wrapped inside the WHERE clause: SELECT ?uri WHERE {{ {{ ... }} UNION {{ ... }} }}"""
+
 sparql_agent_prompt = {
-    "en": """You are a SPARQL query generation agent for DBpedia.
+    "en": f"""You are a SPARQL query generation agent for DBpedia.
 The conversation history contains the entity URIs, DBpedia shape, and categories needed to answer the question.
 
 IMPORTANT: You MUST call execute_sparql before producing any output. Never output a query without first executing it. Your very first action must be a call to execute_sparql.
@@ -181,15 +175,16 @@ Workflow:
    - Empty list or error → call execute_sparql again with an improved query.
 3. Repeat up to 3 times total. After 3 attempts, output the query from [Query] of your best attempt.
 
-SPARQL generation rules:
-- Output only a plain SPARQL query. No markdown, no explanation, no code fences.
-- If the answer is a date, cast it: BIND(xsd:date(STR(?raw)) AS ?date)
-- For a list of things, use a single ?uri column. Merge related answers with UNION, not multiple SELECT variables.
-- DBpedia Categories (dbc:) in the context can be used via: ?uri dct:subject dbc:CategoryName
-  Use categories as an alternative or fallback when structured dbo:/dbp: properties don't return results.
-- UNION must be wrapped inside the WHERE clause: SELECT ?uri WHERE {{ {{ ... }} UNION {{ ... }} }}
-- Be carrefull tu use the proper prefixes as listed in the shape. If the shape listes a dbp use dbp and not dbo, if it only lists dbo, do not use dbp. 
-}
+{_sparql_rules}
 
 Output only the final plain SPARQL query string. No markdown, no code fences, no explanation."""
+}
+
+
+generation_prompt = {
+    "en": f"""Using the context provided above (entity URIs, shape, categories), generate a SPARQL query to answer the following question.
+
+Question: {{question}}
+{{suggestions_block}}
+{_sparql_rules}"""
 }
