@@ -85,6 +85,7 @@ class LLMAgentDBpedia:
             api_key=os.getenv("mKGQAgent_EAT_LLM"),
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
+            temperature=0,
             callbacks=[self.log_handler]
         )
 
@@ -93,6 +94,7 @@ class LLMAgentDBpedia:
             api_key=os.getenv("mKGQAgent_Execution_original_LLM"),
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
+            temperature=0,
             callbacks=[self.log_handler]
         )
 
@@ -111,6 +113,7 @@ class LLMAgentDBpedia:
             api_key=os.getenv("mKGQAgent_Shapes_LLM"),
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
+            temperature=0,
             callbacks=[self.log_handler]
         )
 
@@ -119,6 +122,7 @@ class LLMAgentDBpedia:
             api_key=os.getenv("mKGQAgent_Translation_LLM"),
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
+            temperature=0,
             callbacks=[self.log_handler]
         )
 
@@ -127,6 +131,7 @@ class LLMAgentDBpedia:
             api_key=os.getenv("mKGQAgent_Context_LLM", os.getenv("mKGQAgent_Execution_original_LLM")),
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
+            temperature=0,
             callbacks=[self.log_handler]
         )
 
@@ -135,6 +140,7 @@ class LLMAgentDBpedia:
             api_key=os.getenv("mKGQAgent_Categories_LLM"),
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
+            temperature=0,
             callbacks=[self.log_handler]
         )
 
@@ -143,6 +149,7 @@ class LLMAgentDBpedia:
             api_key=os.getenv("mKGQAgent_Check_LLM", os.getenv("mKGQAgent_Context_LLM", os.getenv("mKGQAgent_Execution_original_LLM"))),
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
+            temperature=0,
             callbacks=[self.log_handler]
         )
 
