@@ -28,6 +28,7 @@ category_selection_prompt = {
 {categories}
 
 Select only the category URIs that are most likely relevant to answering the question.
+Only return categories that ar elikely to return the answer to the question with a query of the form: ?uri dct:subject dbc:CategoryName.
 Return a comma-separated list of the full URIs (e.g. http://dbpedia.org/resource/Category:Foo, http://dbpedia.org/resource/Category:Bar).
 If none are relevant, return an empty string."""
 }
@@ -36,10 +37,10 @@ class_instances_prompt = {
     "en": """Determine if the term "{label}" refers to a specific named entity or a general class/type of things.
 
 A NAMED ENTITY is a unique, specific thing: a particular person, place, organization, creative work, etc.
-Examples: "Michael Jackson", "Eiffel Tower", "Apple Inc.", "Uzi"
+Examples: "Germany", "Eiffel Tower", "Apple Inc.", "Uzi"
 
 A CLASS/TYPE is a general category that many things can belong to.
-Examples: "Animal", "Country", "Musical Artist", "Film", "Weapon", "City"
+Examples: "Country", "Musical Artist", "Film", "Weapon", "City"
 
 If "{label}" is a NAMED ENTITY, respond with exactly:
 ENTITY
@@ -48,8 +49,8 @@ If "{label}" is a CLASS/TYPE, respond with exactly:
 CLASS
 
 Examples:
-"Michael Jackson" → ENTITY
-"Animal" → CLASS"""
+"Germany" → ENTITY
+"Country" → CLASS"""
 }
 
 
@@ -86,12 +87,13 @@ Question: "{nlq}"
 
 Rules:
 - Return ONLY a comma-separated list of labels, no explanations.
-- Use singular form and capitalise as a DBpedia class would be (e.g. "Novelist" not "novelists").
+- Use singular form and capitalise as a DBpedia class would be (e.g. "City" not "cities").
 - Descriptive adjectives like "largest", "extinct", "female" are filters, NOT entities — do not include them.
 - Titles of creative works (books, films, games, albums, TV series, etc.) are single named entities regardless of how many words they contain. Treat the full title as one item (e.g. "The Pillars of the Earth", NOT "pillar", "earth").
 - Full person names must be kept together (e.g. "Abraham Lincoln" NOT "Abraham" or "Lincoln").
 - If a named entity is referred to only by a partial name, expand it to the most complete, commonly recognized form (e.g. "Napoleon" → "Napoleon Bonaparte").
-- Only include a class label if it appears as an explicit noun category in the question (e.g. "novelist", "weapon", "state"). Never extract "Person" — it is too generic.
+- Only include a class label if it appears as an explicit noun category in the question (e.g. "novelist", "weapon", "state").
+- Never extract "Person" — it is too generic.
 
 Example: "Who developed Skype?"
 Result: Skype
@@ -181,14 +183,13 @@ Workflow:
 
 SPARQL generation rules:
 - Output only a plain SPARQL query. No markdown, no explanation, no code fences.
-- Use ASK for yes/no questions ("Are there any...", "Is X the Y of Z?"). Use SELECT for all others.
 - If the answer is a date, cast it: BIND(xsd:date(STR(?raw)) AS ?date)
 - For a list of things, use a single ?uri column. Merge related answers with UNION, not multiple SELECT variables.
-- Use dbo: properties from the shape. Only use dbp: if the shape explicitly listed that property with a dbp: prefix.
 - DBpedia Categories (dbc:) in the context can be used via: ?uri dct:subject dbc:CategoryName
   Use categories as an alternative or fallback when structured dbo:/dbp: properties don't return results.
 - UNION must be wrapped inside the WHERE clause: SELECT ?uri WHERE {{ {{ ... }} UNION {{ ... }} }}
-- Do NOT use SERVICE wikibase:label
+- Be carrefull tu use the proper prefixes as listed in the shape. If the shape listes a dbp use dbp and not dbo, if it only lists dbo, do not use dbp. 
+}
 
 Output only the final plain SPARQL query string. No markdown, no code fences, no explanation."""
 }
