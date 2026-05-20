@@ -317,9 +317,9 @@ class LLMAgentDBpedia:
                 translated_question = self._translate_step(input_question)
                 self._step_times.append(f"translation: {time.perf_counter() - _t0:.2f}s")
 
-                #_t0 = time.perf_counter()
-                #self._eat_step(chat_history, translated_question)
-                #self._step_times.append(f"eat: {time.perf_counter() - _t0:.2f}s")
+                _t0 = time.perf_counter()
+                self._eat_step(chat_history, translated_question)
+                self._step_times.append(f"eat: {time.perf_counter() - _t0:.2f}s")
 
                 _t0 = time.perf_counter()
                 self._get_similar_examples_step(chat_history, translated_question)
