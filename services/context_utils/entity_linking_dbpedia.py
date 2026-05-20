@@ -8,7 +8,7 @@ def falcon_external(text: str):
     url = 'https://labs.tib.eu/falcon/falcon2/api'
     headers = {'Content-Type': 'application/json'}
     data = {'text': text}
-    params = {'mode': 'short', 'db': '1'}
+    params = {'mode': 'long', 'db': '1'}
     response = requests.post(url, headers=headers, json=data, params=params, timeout=30)
     return response.json()
 

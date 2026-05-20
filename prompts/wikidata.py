@@ -134,12 +134,12 @@ _sparql_rules = """SPARQL generation rules for Wikidata:
 - For qualified statements (e.g. a value with a point-in-time qualifier), use the full statement pattern:
     ?item p:P... ?stmt . ?stmt ps:P... ?value . ?stmt pq:P... ?qualifier .
 - To retrieve human-readable labels, add at the end of the WHERE clause:
-    SERVICE wikibase:label { bd:serviceParam wikibase:language "en" . }
+    SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en" . }}
   and use ?itemLabel, ?valueLabel etc. for display.
 - CRITICAL: Use the EXACT property shown in the shape — do not substitute wdt: for p: or vice versa.
 - If the answer is a date, it is already typed as xsd:dateTime in Wikidata; cast if needed: BIND(xsd:date(STR(?raw)) AS ?date)
 - For a list of things, use a single ?item or ?itemLabel column.
-- UNION must be wrapped inside the WHERE clause: SELECT ?item WHERE { { ... } UNION { ... } }
+- UNION must be wrapped inside the WHERE clause: SELECT ?item WHERE {{ {{ ... }} UNION {{ ... }} }}
 - Do not use dbo:, dbr:, or any DBpedia prefixes."""
 
 sparql_agent_prompt = {

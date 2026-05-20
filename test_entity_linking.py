@@ -42,6 +42,4 @@ if __name__ == "__main__":
     print(f"\nNLQ:      {nlq}")
     print(f"Entities: {entities}")
 
-    run("1. SPARQL rdfs:label lookup  (dbpedia_el)", dbpedia_el, nlq, entities)
-    run("2. Falcon 2.0               (dbpedia_el_falcon)", dbpedia_el_falcon, nlq, entities)
-    run("3. DBpedia Spotlight         (spotlight_external)", spotlight_external, nlq)
+    run("1. Falcon  (dbpedia_el)", dbpedia_el, nlq, entities)

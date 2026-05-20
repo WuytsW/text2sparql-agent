@@ -3,6 +3,8 @@ import requests
 from concurrent.futures import ThreadPoolExecutor
 from fuzzywuzzy import fuzz
 
+_WIKIDATA_USER_AGENT = "text2sparql-agent/1.0 (https://github.com/WuytsW; contact: wuytswillem@gmail.com)"
+
 
 def falcon_external_wikidata(text: str) -> list:
     """Call Falcon 2.0 in Wikidata mode. Returns [{label: uri}, ...] list."""
@@ -38,8 +40,9 @@ def wikidata_api_search(entity_name: str, lang: str = "en", similarity: int = 85
         "type": "item",
         "limit": 3,
     }
+    headers = {"User-Agent": _WIKIDATA_USER_AGENT}
     try:
-        response = requests.get(url, params=params, timeout=20)
+        response = requests.get(url, params=params, headers=headers, timeout=20)
         response.raise_for_status()
         data = response.json()
         results = []

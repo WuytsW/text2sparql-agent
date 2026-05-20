@@ -94,7 +94,7 @@ def execute_wikidata(query: str, max_retries: int = 5) -> dict:
 def search_entity(query: str, lang: str = "en", similarity: int = 90, search_limit: int = 3):
   wdt_search_url = "https://www.wikidata.org/w/api.php?action=wbsearchentities&search={search}&format=json&language={lang}&uselang={lang}&type=item&limit={search_limit}"
   try:
-    response = requests.get(wdt_search_url.format(search=query, lang=lang, search_limit=search_limit), timeout=20)
+    response = requests.get(wdt_search_url.format(search=query, lang=lang, search_limit=search_limit), headers={"User-Agent": _WIKIDATA_USER_AGENT}, timeout=20)
     data = response.json()
     ne_list = []
     rel_list = []
