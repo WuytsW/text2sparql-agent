@@ -12,7 +12,7 @@ from langchain.tools import tool
 from SPARQLWrapper import SPARQLWrapper, JSON as SPARQL_JSON
 from services.log_utils.log import log_message
 
-from services.context_utils.shape_generation import generate_shape
+from services.context_utils.shape_generation_dbpedia import generate_shape
 from services.context_utils.category_linking import _fetch_categories_for_topic
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 
@@ -134,7 +134,7 @@ class EntityLinkingInput(BaseModel):
 
 def make_entity_linking_tool():
     """Factory that returns an entity_linking_tool wrapping dbpedia_el."""
-    from services.context_utils.entity_linking import dbpedia_el
+    from services.context_utils.entity_linking_dbpedia import dbpedia_el
 
     @tool("entity_linking_tool", args_schema=EntityLinkingInput)
     def entity_linking_tool(nlq: str, ne_list: list) -> str:
@@ -185,9 +185,11 @@ class ContextCheckInput(BaseModel):
     shape: str = Field(description="The DBpedia shape text (available properties)")
 
 
-def make_context_check_tool(llm):
+def make_context_check_tool(llm, context_prompt=None):
     """Factory that returns a context_check_tool bound to the given LLM."""
-    from prompts.dbpedia import context_check_prompt
+    if context_prompt is None:
+        from prompts.dbpedia import context_check_prompt
+        context_prompt = context_check_prompt
 
     @tool("context_check_tool", args_schema=ContextCheckInput)
     def context_check_tool(nlq: str, entities: list, entity_uris: list, categories: list, shape: str) -> dict:
@@ -196,7 +198,7 @@ def make_context_check_tool(llm):
         Returns a dict with 'valid' (bool) and 'reason' (str).
         """
         import json as _json
-        prompt = context_check_prompt["en"].format(
+        prompt = context_prompt["en"].format(
             nlq=nlq,
             entities=entities or [],
             entity_uris=entity_uris or [],

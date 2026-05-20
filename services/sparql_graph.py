@@ -18,16 +18,20 @@ from prompts.dbpedia import generation_prompt, check_result_prompt, sparql_agent
 # ---------------------------------------------------------------------------
 
 class ExecuteSPARQLInput(BaseModel):
-    query: str = Field(description="The SPARQL query string to execute against DBpedia")
+    query: str = Field(description="The SPARQL query string to execute")
 
 
-def make_sparql_agent(generation_llm, sparql_endpoint: str, lang: str = "en"):
+def make_sparql_agent(generation_llm, sparql_endpoint: str, lang: str = "en",
+                      agent_prompt=None, execute_fn=None):
+    _agent_prompt = agent_prompt if agent_prompt is not None else sparql_agent_prompt
+    _execute = execute_fn if execute_fn is not None else (lambda query: execute(query=query, endpoint_url=sparql_endpoint))
+
     @tool("execute_sparql", args_schema=ExecuteSPARQLInput)
     def execute_sparql(query: str) -> str:
-        """Execute a SPARQL query against DBpedia. Returns [Query] and [Result] fields; result is bindings (first 3), boolean (ASK), or error."""
+        """Execute a SPARQL query. Returns [Query] and [Result] fields; result is bindings (first 3), boolean (ASK), or error."""
         log_message(step_name="execute_sparql called", color="Cyan", messages=[query])
         try:
-            raw = execute(query=query, endpoint_url=sparql_endpoint)
+            raw = _execute(query)
             if isinstance(raw, dict) and "error" not in raw:
                 if "boolean" in raw:
                     bindings_repr = json.dumps({"boolean": raw["boolean"]})
@@ -44,7 +48,7 @@ def make_sparql_agent(generation_llm, sparql_endpoint: str, lang: str = "en"):
     tools = [execute_sparql]
 
     prompt = ChatPromptTemplate.from_messages([
-        ("system", sparql_agent_prompt[lang]),
+        ("system", _agent_prompt[lang]),
         MessagesPlaceholder("chat_history"),
         ("human", "{question}"),
         MessagesPlaceholder("agent_scratchpad"),
@@ -84,12 +88,16 @@ class SparqlLoopState(TypedDict):
     attempt_count: int
 
 
-def make_sparql_graph(generation_llm, check_llm) -> StateGraph:
+def make_sparql_graph(generation_llm, check_llm,
+                      gen_prompt=None, check_prompt=None, execute_fn=None) -> StateGraph:
     """
     Builds and compiles the SPARQL generation loop as a LangGraph sub-graph.
     Flow: generate_node → execute_node → check_node → (retry or END)
     Up to 3 attempts; suggestions from failed checks are fed back into generate_node.
     """
+    _gen_prompt = gen_prompt if gen_prompt is not None else generation_prompt
+    _check_prompt = check_prompt if check_prompt is not None else check_result_prompt
+    _execute_fn = execute_fn  # None means use state["sparql_endpoint"] via execute()
 
     def generate_node(state: SparqlLoopState) -> dict:
         suggestions = state["suggestions"]
@@ -97,7 +105,7 @@ def make_sparql_graph(generation_llm, check_llm) -> StateGraph:
                     messages=[f"suggestions: {suggestions}" if suggestions else "first attempt"])
         suggestions_block = f"\nPrior feedback:\n{suggestions}" if suggestions else ""
         messages = state["chat_history"] + [HumanMessage(
-            generation_prompt[state["lang"]].format(
+            _gen_prompt[state["lang"]].format(
                 question=state["question"], suggestions_block=suggestions_block
             )
         )]
@@ -109,7 +117,10 @@ def make_sparql_graph(generation_llm, check_llm) -> StateGraph:
         query = state["query"]
         log_message(step_name="execute_sparql called", color="Cyan", messages=[query])
         try:
-            raw = execute(query=query, endpoint_url=state["sparql_endpoint"])
+            if _execute_fn is not None:
+                raw = _execute_fn(query)
+            else:
+                raw = execute(query=query, endpoint_url=state["sparql_endpoint"])
             if isinstance(raw, dict) and "error" not in raw:
                 if "boolean" in raw:
                     exec_result = json.dumps({"boolean": raw["boolean"]})
@@ -127,7 +138,7 @@ def make_sparql_graph(generation_llm, check_llm) -> StateGraph:
         exec_result = state["exec_result"]
         log_message(step_name="check_result called", color="Cyan",
                     messages=[f"query: {query}", f"result: {exec_result}"])
-        prompt_text = check_result_prompt[state["lang"]].format(
+        prompt_text = _check_prompt[state["lang"]].format(
             question=state["question"], query=query, execution_result=exec_result
         )
         response = check_llm.invoke([HumanMessage(prompt_text)]).content

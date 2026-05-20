@@ -6,11 +6,11 @@ Usage:  python test_entity_linking.py
 import sys
 import time
 
-from services.context_utils.entity_linking import (
+from services.context_utils.entity_linking_dbpedia import (
     dbpedia_el,
-    dbpedia_el_falcon,
     spotlight_external,
 )
+dbpedia_el_falcon = dbpedia_el  # alias: Falcon is used internally by dbpedia_el
 
 DEFAULT_NLQ = "What is the time zone of Salt Lake City?"
 DEFAULT_ENTITIES = ["Salt Lake City", "Time Zone"]

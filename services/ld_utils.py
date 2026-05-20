@@ -1,5 +1,7 @@
 import json
+import os
 import re
+import time
 import requests
 from fuzzywuzzy import fuzz
 from SPARQLWrapper import SPARQLWrapper, JSON
@@ -25,6 +27,68 @@ prefixes_list = [
     {"dbc": "PREFIX dbc: <http://dbpedia.org/resource/Category:>"},
 ]
 
+wikidata_prefixes_list = [
+    {"wd": "PREFIX wd: <http://www.wikidata.org/entity/>"},
+    {"wdt": "PREFIX wdt: <http://www.wikidata.org/prop/direct/>"},
+    {"p": "PREFIX p: <http://www.wikidata.org/prop/>"},
+    {"ps": "PREFIX ps: <http://www.wikidata.org/prop/statement/>"},
+    {"pq": "PREFIX pq: <http://www.wikidata.org/prop/qualifier/>"},
+    {"wikibase": "PREFIX wikibase: <http://wikiba.se/ontology#>"},
+    {"bd": "PREFIX bd: <http://www.bigdata.com/rdf#>"},
+    {"rdfs": "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>"},
+    {"xsd": "PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>"},
+    {"schema": "PREFIX schema: <http://schema.org/>"},
+]
+
+_WIKIDATA_USER_AGENT = "text2sparql-agent/1.0 (https://github.com/WuytsW; contact: wuytswillem@gmail.com)"
+
+
+def post_process_wikidata(query: str) -> str:
+    """Extract SPARQL from code fences, inject missing Wikidata prefixes."""
+    blocks = extract_code_blocks(query)
+    query = blocks[0].strip() if blocks else query.strip()
+    query = fix_union_syntax(query)
+    try:
+        parse_object = parseQuery(query)
+        existing = [p.prefix for p in parse_object[0]] if parse_object[0] else []
+        missing = "\n".join(
+            list(p.values())[0]
+            for p in wikidata_prefixes_list
+            if list(p.keys())[0] not in existing
+        )
+        return (missing + "\n" + query).strip() if missing else query
+    except Exception:
+        return query
+
+
+def execute_wikidata(query: str, max_retries: int = 5) -> dict:
+    """Execute SPARQL against the Wikidata endpoint with retry on HTTP 429."""
+    processed = post_process_wikidata(query)
+    endpoint = os.getenv("WIKIDATA_SPARQL_URL", "https://query.wikidata.org/sparql")
+    headers = {
+        "User-Agent": _WIKIDATA_USER_AGENT,
+        "Accept": "application/sparql-results+json",
+        "Accept-Encoding": "gzip,deflate",
+    }
+    for attempt in range(max_retries):
+        try:
+            resp = requests.get(
+                endpoint,
+                params={"query": processed, "format": "json"},
+                headers=headers,
+                timeout=60,
+            )
+            if resp.status_code == 429:
+                wait = int(resp.headers.get("Retry-After", 2 ** attempt))
+                time.sleep(wait)
+                continue
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as e:
+            if attempt == max_retries - 1:
+                return {"error": str(e)}
+            time.sleep(2 ** attempt)
+    return {"error": "max retries exceeded"}
 
 
 def search_entity(query: str, lang: str = "en", similarity: int = 90, search_limit: int = 3):

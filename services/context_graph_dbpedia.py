@@ -33,9 +33,9 @@ def make_context_graph(entities_llm, shapes_llm, check_llm, categories_llm=None,
     After 3 failures: accept the last shape unconditionally.
     """
     from services.context_utils.entity_extraction import extract_entities
-    from services.context_utils.entity_linking import dbpedia_el
+    from services.context_utils.entity_linking_dbpedia import dbpedia_el
     from services.context_utils.category_linking import fetch_categories
-    from services.context_utils.shape_generation import generate_shape
+    from services.context_utils.shape_generation_dbpedia import generate_shape
     from services.llm_utils import make_context_check_tool
 
     _context_check = make_context_check_tool(check_llm)
