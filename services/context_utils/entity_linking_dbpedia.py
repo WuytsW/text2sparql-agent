@@ -1,4 +1,6 @@
+import logging
 import os
+import time
 import requests
 from concurrent.futures import ThreadPoolExecutor
 from SPARQLWrapper import SPARQLWrapper, JSON
@@ -13,13 +15,17 @@ def falcon_external(text: str):
     return response.json()
 
 
-def spotlight_external(text: str, confidence: float = 0.35) -> dict:
+def spotlight_external(text: str, confidence: float = 0.35, retries: int = 2) -> dict:
     url = 'https://api.dbpedia-spotlight.org/en/annotate'
     headers = {'Accept': 'application/json'}
     data = {'text': text, 'confidence': confidence}
-    response = requests.post(url, headers=headers, data=data, timeout=15)
-    response.raise_for_status()
-    return response.json()
+    for attempt in range(retries + 1):
+        response = requests.post(url, headers=headers, data=data, timeout=15)
+        if response.status_code < 500 or attempt == retries:
+            response.raise_for_status()
+            return response.json()
+        time.sleep(2 ** attempt)
+    return {}
 
 
 def sparql_entity_lookup(entity_name: str) -> list[dict]:
@@ -65,13 +71,22 @@ def dbpedia_el(nlq: str, ne_list: list) -> list:
 
     texts = [nlq] + ne_list
     with ThreadPoolExecutor() as executor:
-        falcon_results = list(executor.map(falcon_external, texts))
+        futures = [executor.submit(spotlight_external, t) for t in texts]
+        for future in futures:
+            try:
+                result = future.result()
+            except Exception as e:
+                logging.debug(f"[dbpedia_el] spotlight failed for one text: {e}")
+                continue
+            for item in result.get("entities_dbpedia", []) + result.get("relations_dbpedia", []):
+                uri = list(item.values())[0] if item else None
+                if uri and uri not in seen:
+                    seen.add(uri)
+                    nel_list.append(item)
 
-    for falcon_result in falcon_results:
-        for item in falcon_result.get("entities_dbpedia", []) + falcon_result.get("relations_dbpedia", []):
-            uri = list(item.values())[0] if item else None
-            if uri and uri not in seen:
-                seen.add(uri)
-                nel_list.append(item)
+    if not nel_list and ne_list:
+        logging.debug("[dbpedia_el] spotlight returned nothing, falling back to SPARQL")
+        nel_list = dbpedia_el_sparql(nlq, ne_list)
 
+    logging.debug(f"[dbpedia_el] found {len(nel_list)} entities: {nel_list}")
     return nel_list
