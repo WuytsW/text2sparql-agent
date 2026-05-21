@@ -40,7 +40,9 @@ class LogLLMCallbackHandler(BaseCallbackHandler):
         self.call_count += 1
         if not self._enabled:
             return
-        model = serialized.get("kwargs", {}).get("model_name", "unknown")
+        llm_kwargs = serialized.get("kwargs", {})
+        model = llm_kwargs.get("model_name", "unknown")
+        temperature = llm_kwargs.get("temperature", "?")
 
         def _msg_dict(m):
             d = {"type": m.type, "content": m.content}
@@ -53,7 +55,7 @@ class LogLLMCallbackHandler(BaseCallbackHandler):
         self._log_entries.append({"call": self.call_count, "model": model, "messages": msgs})
         formatted = self._format_messages(msgs)
         log_message(
-            step_name=f"LLM API call #{self.call_count} model={model}",
+            step_name=f"LLM API call #{self.call_count} model={model} temperature={temperature}",
             color="Blue",
             messages=formatted.splitlines(),
         )
