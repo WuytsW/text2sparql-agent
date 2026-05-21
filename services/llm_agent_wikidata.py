@@ -73,9 +73,12 @@ class LLMAgentWikidata:
         self.log_handler = LogLLMCallbackHandler()
         self._init_llms(model_name)
         self._step_times: list = []
+        self._use_icl = True
+        self._use_eat = True
+        self._use_context = True
         ### END Initialize agent
 
-    def _init_llms(self, model_name: str, log_calls: bool = False):
+    def _init_llms(self, model_name: str, log_calls: bool = False, temperature: float = 0):
         _or_kwargs = {"extra_body": {"provider": {"ignore": ["Novita"], "require_parameters": True}}}
 
         self.llm_eat = ChatOpenAI(
@@ -83,6 +86,7 @@ class LLMAgentWikidata:
             api_key=os.getenv("mKGQAgent_EAT_LLM"),
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
+            temperature=temperature,
             callbacks=[self.log_handler]
         )
 
@@ -91,6 +95,7 @@ class LLMAgentWikidata:
             api_key=os.getenv("mKGQAgent_Execution_original_LLM"),
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
+            temperature=temperature,
             callbacks=[self.log_handler]
         )
 
@@ -98,7 +103,7 @@ class LLMAgentWikidata:
             model=model_name,
             api_key=os.getenv("mKGQAgent_Entities_LLM"),
             base_url="https://openrouter.ai/api/v1",
-            temperature=0.2,
+            temperature=temperature,
             max_tokens=50,
             model_kwargs=_or_kwargs,
             callbacks=[self.log_handler]
@@ -109,6 +114,7 @@ class LLMAgentWikidata:
             api_key=os.getenv("mKGQAgent_Shapes_LLM"),
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
+            temperature=temperature,
             callbacks=[self.log_handler]
         )
 
@@ -117,6 +123,7 @@ class LLMAgentWikidata:
             api_key=os.getenv("mKGQAgent_Translation_LLM"),
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
+            temperature=temperature,
             callbacks=[self.log_handler]
         )
 
@@ -125,6 +132,7 @@ class LLMAgentWikidata:
             api_key=os.getenv("mKGQAgent_Context_LLM", os.getenv("mKGQAgent_Execution_original_LLM")),
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
+            temperature=temperature,
             callbacks=[self.log_handler]
         )
 
@@ -133,6 +141,7 @@ class LLMAgentWikidata:
             api_key=os.getenv("mKGQAgent_Check_LLM", os.getenv("mKGQAgent_Context_LLM", os.getenv("mKGQAgent_Execution_original_LLM"))),
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
+            temperature=temperature,
             callbacks=[self.log_handler]
         )
 
@@ -236,14 +245,17 @@ class LLMAgentWikidata:
             final_query = result.get("query", "")
         return final_query
 
-    def _init_workflow(self):
+    def _init_workflow(self, use_context: bool = True):
         workflow = StateGraph(PlanExecute)
 
-        workflow.add_node("context", self._context_step)
-        workflow.add_node("sparql_loop", self._sparql_loop_step)
-
-        workflow.set_entry_point("context")
-        workflow.add_edge("context", "sparql_loop")
+        if use_context:
+            workflow.add_node("context", self._context_step)
+            workflow.add_node("sparql_loop", self._sparql_loop_step)
+            workflow.set_entry_point("context")
+            workflow.add_edge("context", "sparql_loop")
+        else:
+            workflow.add_node("sparql_loop", self._sparql_loop_step)
+            workflow.set_entry_point("sparql_loop")
         workflow.add_edge("sparql_loop", END)
 
         self.app = workflow.compile()
@@ -261,13 +273,14 @@ class LLMAgentWikidata:
         log_message(step_name="Similar examples retrieved for ICL", color="Yellow", messages=[example])
         return example
 
-    def generate_sparql(self, input_question: str, model_name: str = "openai/gpt-4o-mini", log_calls: bool = True, entity_profile_step: bool = True) -> dict:
+    def generate_sparql(self, input_question: str, model_name: str = "openai/gpt-4o-mini", log_calls: bool = True, temperature: float = 0, use_icl: bool = True, use_eat: bool = True, use_context: bool = True) -> dict:
         """Convert a natural language question to a SPARQL query over Wikidata."""
         try:
-            if model_name != self.current_model:
-                self._init_llms(model_name, log_calls=log_calls)
-            if self.app is None:
-                self._init_workflow()
+            if model_name != self.current_model or temperature != self.llm_eat.temperature:
+                self._init_llms(model_name, log_calls=log_calls, temperature=temperature)
+            if self.app is None or (use_icl, use_eat, use_context) != (self._use_icl, self._use_eat, self._use_context):
+                self._use_icl, self._use_eat, self._use_context = use_icl, use_eat, use_context
+                self._init_workflow(use_context=use_context)
 
             self._step_times = []
             self.log_handler.reset(input_question, enabled=log_calls)
@@ -280,13 +293,15 @@ class LLMAgentWikidata:
                 translated_question = self._translate_step(input_question)
                 self._step_times.append(f"translation: {time.perf_counter() - _t0:.2f}s")
 
-                _t0 = time.perf_counter()
-                self._eat_step(chat_history, translated_question)
-                self._step_times.append(f"eat: {time.perf_counter() - _t0:.2f}s")
+                if use_eat:
+                    _t0 = time.perf_counter()
+                    self._eat_step(chat_history, translated_question)
+                    self._step_times.append(f"eat: {time.perf_counter() - _t0:.2f}s")
 
-                _t0 = time.perf_counter()
-                self._get_similar_examples_step(chat_history, translated_question)
-                self._step_times.append(f"icl: {time.perf_counter() - _t0:.2f}s")
+                if use_icl:
+                    _t0 = time.perf_counter()
+                    self._get_similar_examples_step(chat_history, translated_question)
+                    self._step_times.append(f"icl: {time.perf_counter() - _t0:.2f}s")
 
                 result = self.app.invoke(
                     {

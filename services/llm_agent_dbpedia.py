@@ -72,9 +72,12 @@ class LLMAgentDBpedia:
         self.log_handler = LogLLMCallbackHandler()
         self._init_llms(model_name)
         self._step_times: list = []
+        self._use_icl = True
+        self._use_eat = True
+        self._use_context = True
         ### END Initialize agent
 
-    def _init_llms(self, model_name: str, log_calls: bool = False):
+    def _init_llms(self, model_name: str, log_calls: bool = False, temperature: float = 0):
         # OpenRouter routes qwen models to Novita's /completions endpoint by default,
         # but Novita only supports /chat/completions for these models. Ignoring Novita
         # forces OpenRouter to pick a provider that handles chat completions correctly.
@@ -85,7 +88,7 @@ class LLMAgentDBpedia:
             api_key=os.getenv("mKGQAgent_EAT_LLM"),
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
-            temperature=0,
+            temperature=temperature,
             callbacks=[self.log_handler]
         )
 
@@ -94,7 +97,7 @@ class LLMAgentDBpedia:
             api_key=os.getenv("mKGQAgent_Execution_original_LLM"),
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
-            temperature=0,
+            temperature=temperature,
             callbacks=[self.log_handler]
         )
 
@@ -102,7 +105,7 @@ class LLMAgentDBpedia:
             model=model_name,
             api_key=os.getenv("mKGQAgent_Entities_LLM"),
             base_url="https://openrouter.ai/api/v1",
-            temperature=0.2,
+            temperature=temperature,
             max_tokens=50,
             model_kwargs=_or_kwargs,
             callbacks=[self.log_handler]
@@ -113,7 +116,7 @@ class LLMAgentDBpedia:
             api_key=os.getenv("mKGQAgent_Shapes_LLM"),
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
-            temperature=0,
+            temperature=temperature,
             callbacks=[self.log_handler]
         )
 
@@ -122,7 +125,7 @@ class LLMAgentDBpedia:
             api_key=os.getenv("mKGQAgent_Translation_LLM"),
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
-            temperature=0,
+            temperature=temperature,
             callbacks=[self.log_handler]
         )
 
@@ -131,7 +134,7 @@ class LLMAgentDBpedia:
             api_key=os.getenv("mKGQAgent_Context_LLM", os.getenv("mKGQAgent_Execution_original_LLM")),
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
-            temperature=0,
+            temperature=temperature,
             callbacks=[self.log_handler]
         )
 
@@ -140,7 +143,7 @@ class LLMAgentDBpedia:
             api_key=os.getenv("mKGQAgent_Categories_LLM"),
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
-            temperature=0,
+            temperature=temperature,
             callbacks=[self.log_handler]
         )
 
@@ -149,7 +152,7 @@ class LLMAgentDBpedia:
             api_key=os.getenv("mKGQAgent_Check_LLM", os.getenv("mKGQAgent_Context_LLM", os.getenv("mKGQAgent_Execution_original_LLM"))),
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
-            temperature=0,
+            temperature=temperature,
             callbacks=[self.log_handler]
         )
 
@@ -173,20 +176,27 @@ class LLMAgentDBpedia:
         log_message(step_name="Translated question", color="Yellow", messages=[translated_question])
         return translated_question
 
-    def _get_similar_examples_step(self, chat_history: list, nlq: str):
-        icl_message = self.get_similar_examples(nlq)
-        chat_history.append(HumanMessage(icl_message))
+    def _get_similar_examples_step(self, state: PlanExecute):
+        _t0 = time.perf_counter()
+        icl_message = self.get_similar_examples(state["input"])
+        self._step_times.append(f"icl: {time.perf_counter() - _t0:.2f}s")
+        return {"chat_history": state["chat_history"] + [HumanMessage(icl_message)]}
 
-    def _eat_step(self, chat_history: list, nlq: str):
+    def _eat_step(self, state: PlanExecute):
         """Classify expected answer type and append it to chat_history."""
+        _t0 = time.perf_counter()
         try:
-            expected_answer_type = get_expected_answer_type(nlq, self.llm_eat)
+            expected_answer_type = get_expected_answer_type(state["input"], self.llm_eat)
             eat = expected_answer_type["expected_answer_type"]["eat"]
             eat_message = f"Expected answer type: {eat}"
-            chat_history.append(AIMessage(eat_message))
             log_message(step_name="Expected answer type", color="Yellow", messages=[eat])
         except Exception as e:
+            eat_message = ""
             log_message(step_name="Expected answer type failed", color="Red", messages=[str(e)])
+        self._step_times.append(f"eat: {time.perf_counter() - _t0:.2f}s")
+        if eat_message:
+            return {"chat_history": state["chat_history"] + [AIMessage(eat_message)]}
+        return {}
 
     def _context_step(self, state: PlanExecute):
         result = self._context_graph.invoke({
@@ -262,14 +272,25 @@ class LLMAgentDBpedia:
             final_query = result.get("query", "")
         return final_query
 
-    def _init_workflow(self):
+    def _init_workflow(self, use_eat: bool = True, use_icl: bool = True, use_context: bool = True):
         workflow = StateGraph(PlanExecute)
 
-        workflow.add_node("context", self._context_step)
+        steps = []
+        if use_eat:
+            workflow.add_node("eat", self._eat_step)
+            steps.append("eat")
+        if use_icl:
+            workflow.add_node("icl", self._get_similar_examples_step)
+            steps.append("icl")
+        if use_context:
+            workflow.add_node("context", self._context_step)
+            steps.append("context")
         workflow.add_node("sparql_loop", self._sparql_loop_step)
+        steps.append("sparql_loop")
 
-        workflow.set_entry_point("context")
-        workflow.add_edge("context", "sparql_loop")
+        workflow.set_entry_point(steps[0])
+        for i in range(len(steps) - 1):
+            workflow.add_edge(steps[i], steps[i + 1])
         workflow.add_edge("sparql_loop", END)
 
         self.app = workflow.compile()
@@ -287,7 +308,7 @@ class LLMAgentDBpedia:
         log_message(step_name="Similar examples retrieved for ICL", color="Yellow", messages=[example])
         return example
 
-    def generate_sparql(self, input_question: str, model_name: str = "openai/gpt-4o-mini", log_calls: bool = True, entity_profile_step: bool = True) -> dict:
+    def generate_sparql(self, input_question: str, model_name: str = "openai/gpt-4o-mini", log_calls: bool = True, temperature: float = 0, use_icl: bool = True, use_eat: bool = True, use_context: bool = True) -> dict:
         """
         Convert a natural language question to a SPARQL query.
 
@@ -295,16 +316,17 @@ class LLMAgentDBpedia:
             input_question: The natural language question
             model_name: OpenRouter model identifier (e.g. "openai/gpt-4o-mini")
             log_calls: If True, log LLM calls
-            entity_profile_step: Kept for API compatibility (entity profile generation is always active via generate_context_tool)
+            temperature: The temperature for LLM sampling
 
         Returns:
             Dict with translated_question, query, prompt_tokens, completion_tokens, requests
         """
         try:
-            if model_name != self.current_model:
-                self._init_llms(model_name, log_calls=log_calls)
-            if self.app is None:
-                self._init_workflow()
+            if model_name != self.current_model or temperature != self.llm_eat.temperature:
+                self._init_llms(model_name, log_calls=log_calls, temperature=temperature)
+            if self.app is None or (use_icl, use_eat, use_context) != (self._use_icl, self._use_eat, self._use_context):
+                self._use_icl, self._use_eat, self._use_context = use_icl, use_eat, use_context
+                self._init_workflow(use_eat=use_eat, use_icl=use_icl, use_context=use_context)
 
             self._step_times = []
             self.log_handler.reset(input_question, enabled=log_calls)
@@ -318,13 +340,6 @@ class LLMAgentDBpedia:
                 self._step_times.append(f"translation: {time.perf_counter() - _t0:.2f}s")
 
                 _t0 = time.perf_counter()
-                self._eat_step(chat_history, translated_question)
-                self._step_times.append(f"eat: {time.perf_counter() - _t0:.2f}s")
-
-                _t0 = time.perf_counter()
-                self._get_similar_examples_step(chat_history, translated_question)
-                self._step_times.append(f"icl: {time.perf_counter() - _t0:.2f}s")
-
                 result = self.app.invoke(
                     {
                         "input": translated_question,
