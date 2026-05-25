@@ -73,13 +73,18 @@ class LLMAgentWikidata:
         self.log_handler = LogLLMCallbackHandler()
         self._init_llms(model_name)
         self._step_times: list = []
+        self._use_translate = True
         self._use_icl = True
         self._use_eat = True
         self._use_context = True
         ### END Initialize agent
 
     def _init_llms(self, model_name: str, log_calls: bool = False, temperature: float = 0):
-        _or_kwargs = {"extra_body": {"provider": {"ignore": ["Novita"], "require_parameters": True}}}
+        # OpenRouter routes qwen models to Novita's /completions endpoint by default,
+        # but Novita only supports /chat/completions for these models. Ignoring Novita
+        # forces OpenRouter to pick a provider that handles chat completions correctly.
+        # DeepInfra is also excluded because it frequently rate-limits (429) Qwen models.
+        _or_kwargs = {"extra_body": {"provider": {"ignore": ["Novita"]}}}
 
         self.llm_eat = ChatOpenAI(
             model=model_name,
@@ -87,6 +92,7 @@ class LLMAgentWikidata:
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
             temperature=temperature,
+            max_retries=5,
             callbacks=[self.log_handler]
         )
 
@@ -96,6 +102,7 @@ class LLMAgentWikidata:
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
             temperature=temperature,
+            max_retries=5,
             callbacks=[self.log_handler]
         )
 
@@ -104,8 +111,8 @@ class LLMAgentWikidata:
             api_key=os.getenv("mKGQAgent_Entities_LLM"),
             base_url="https://openrouter.ai/api/v1",
             temperature=temperature,
-            max_tokens=50,
             model_kwargs=_or_kwargs,
+            max_retries=5,
             callbacks=[self.log_handler]
         )
 
@@ -115,6 +122,7 @@ class LLMAgentWikidata:
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
             temperature=temperature,
+            max_retries=5,
             callbacks=[self.log_handler]
         )
 
@@ -124,6 +132,7 @@ class LLMAgentWikidata:
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
             temperature=temperature,
+            max_retries=5,
             callbacks=[self.log_handler]
         )
 
@@ -133,6 +142,7 @@ class LLMAgentWikidata:
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
             temperature=temperature,
+            max_retries=5,
             callbacks=[self.log_handler]
         )
 
@@ -142,6 +152,7 @@ class LLMAgentWikidata:
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
             temperature=temperature,
+            max_retries=5,
             callbacks=[self.log_handler]
         )
 
@@ -273,7 +284,7 @@ class LLMAgentWikidata:
         log_message(step_name="Similar examples retrieved for ICL", color="Yellow", messages=[example])
         return example
 
-    def generate_sparql(self, input_question: str, model_name: str = "openai/gpt-4o-mini", log_calls: bool = True, temperature: float = 0, use_icl: bool = True, use_eat: bool = True, use_context: bool = True) -> dict:
+    def generate_sparql(self, input_question: str, model_name: str = "openai/gpt-4o-mini", log_calls: bool = True, temperature: float = 0, use_translate: bool = True, use_icl: bool = True, use_eat: bool = True, use_context: bool = True) -> dict:
         """Convert a natural language question to a SPARQL query over Wikidata."""
         try:
             if model_name != self.current_model or temperature != self.llm_eat.temperature:
@@ -289,9 +300,12 @@ class LLMAgentWikidata:
             chat_history = [SystemMessage(content=system_prompt[self.lang])]
 
             with get_openai_callback() as cb:
-                _t0 = time.perf_counter()
-                translated_question = self._translate_step(input_question)
-                self._step_times.append(f"translation: {time.perf_counter() - _t0:.2f}s")
+                if use_translate:
+                    _t0 = time.perf_counter()
+                    translated_question = self._translate_step(input_question)
+                    self._step_times.append(f"translation: {time.perf_counter() - _t0:.2f}s")
+                else:
+                    translated_question = input_question
 
                 if use_eat:
                     _t0 = time.perf_counter()

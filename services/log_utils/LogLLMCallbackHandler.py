@@ -61,10 +61,22 @@ class LogLLMCallbackHandler(BaseCallbackHandler):
         )
 
     def on_llm_error(self, error, **kwargs):
+        # Try to extract structured provider/status info from OpenRouter errors
+        detail = str(error)
+        try:
+            body = getattr(error, "body", None) or {}
+            err = body.get("error", {}) if isinstance(body, dict) else {}
+            meta = err.get("metadata", {})
+            code = err.get("code") or getattr(error, "status_code", "?")
+            provider = meta.get("provider_name", "unknown")
+            raw = meta.get("raw", "")
+            detail = f"HTTP {code} from {provider}: {raw or err.get('message', detail)}"
+        except Exception:
+            pass
         log_message(
             step_name=f"LLM API error #{self.call_count}",
             color="Red",
-            messages=[str(error)],
+            messages=[detail],
         )
 
     def on_llm_end(self, response, **kwargs):

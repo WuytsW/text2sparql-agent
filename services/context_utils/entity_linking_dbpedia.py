@@ -71,12 +71,12 @@ def dbpedia_el(nlq: str, ne_list: list) -> list:
 
     texts = [nlq] + ne_list
     with ThreadPoolExecutor() as executor:
-        futures = [executor.submit(spotlight_external, t) for t in texts]
+        futures = [executor.submit(falcon_external, t) for t in texts]
         for future in futures:
             try:
                 result = future.result()
             except Exception as e:
-                logging.debug(f"[dbpedia_el] spotlight failed for one text: {e}")
+                logging.debug(f"[dbpedia_el] falcon failed for one text: {e}")
                 continue
             for item in result.get("entities_dbpedia", []) + result.get("relations_dbpedia", []):
                 uri = list(item.values())[0] if item else None
@@ -85,7 +85,7 @@ def dbpedia_el(nlq: str, ne_list: list) -> list:
                     nel_list.append(item)
 
     if not nel_list and ne_list:
-        logging.debug("[dbpedia_el] spotlight returned nothing, falling back to SPARQL")
+        logging.debug("[dbpedia_el] falcon returned nothing, falling back to SPARQL")
         nel_list = dbpedia_el_sparql(nlq, ne_list)
 
     logging.debug(f"[dbpedia_el] found {len(nel_list)} entities: {nel_list}")

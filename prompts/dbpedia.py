@@ -93,7 +93,7 @@ Rules:
 - Full person names must be kept together (e.g. "Abraham Lincoln" NOT "Abraham" or "Lincoln").
 - If a named entity is referred to only by a partial name, expand it to the most complete, commonly recognized form (e.g. "Napoleon" → "Napoleon Bonaparte").
 - Only include a class label if it appears as an explicit noun category in the question (e.g. "novelist", "weapon", "state").
-- CRITICAL Never extract "Person" — it is too generic.
+- Never extract "Person" — it is too generic.
 
 Example: "Who developed Skype?"
 Result: Skype

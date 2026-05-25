@@ -8,6 +8,11 @@ from services.log_utils.log import log_message
 
 load_dotenv(dotenv_path=".env")
 
+# Labels that are too generic to be useful as DBpedia entities/classes.
+# Applied as a hard post-processing filter regardless of LLM output.
+BLOCKED_ENTITY_LABELS = {"person"}  # lowercase for case-insensitive comparison
+
+
 def extract_entities(question, llm, failed_attempts: list = None):
     """
     Extracts entities from the given question using an LLM.
@@ -37,6 +42,9 @@ def extract_entities(question, llm, failed_attempts: list = None):
     entities = [e.strip().strip('"').strip("'") for e in cleaned.split(",") if e.strip()]
 
     entities = [e for e in entities if len(e) > 0 and not e.isspace()]
+
+    # Hard-filter over-generic labels that the LLM should never return
+    entities = [e for e in entities if e.lower() not in BLOCKED_ENTITY_LABELS]
 
     if not isinstance(entities, list):
         raise ValueError("❌ Extraction failed, result is not a list.")

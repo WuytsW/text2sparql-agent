@@ -27,6 +27,7 @@ async def get_answer(
     model_name: str = "openai/gpt-4o-mini",
     log_calls: bool = True,
     temperature: float = 0,
+    use_translate: bool = True,
     use_icl: bool = True,
     use_eat: bool = True,
     use_context: bool = True,
@@ -40,6 +41,7 @@ async def get_answer(
         model_name: OpenRouter model identifier (default: openai/gpt-4o-mini)
         log_calls: If True, log LLM calls
         temperature: The temperature for LLM sampling
+        use_translate: If True, translate the question to English before processing (default: True)
         use_icl: If True, run the in-context learning step (default: True)
         use_eat: If True, run the expected answer type step (default: True)
         use_context: If True, run the entity context step (default: True)
@@ -51,9 +53,9 @@ async def get_answer(
         raise HTTPException(status_code=404, detail="Unknown dataset. Please use one of the known datasets.")
 
     if "dbpedia" in dataset:
-        result = dbpedia_agent.generate_sparql(question, model_name=model_name, log_calls=log_calls, temperature=temperature, use_icl=use_icl, use_eat=use_eat, use_context=use_context)
+        result = dbpedia_agent.generate_sparql(question, model_name=model_name, log_calls=log_calls, temperature=temperature, use_translate=use_translate, use_icl=use_icl, use_eat=use_eat, use_context=use_context)
     elif "wikidata" in dataset:
-        result = wikidata_agent.generate_sparql(question, model_name=model_name, log_calls=log_calls, use_icl=use_icl, use_eat=use_eat, use_context=use_context)
+        result = wikidata_agent.generate_sparql(question, model_name=model_name, log_calls=log_calls, temperature=temperature, use_translate=use_translate, use_icl=use_icl, use_eat=use_eat, use_context=use_context)
     else:
         raise HTTPException(status_code=404, detail="Unknown dataset. Please use one of the known datasets.")
           
