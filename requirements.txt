@@ -14,3 +14,7 @@ SPARQLWrapper
 rdflib
 sentence-transformers
 faiss-cpu
+transformers
+torch
+sentencepiece
+langdetect
