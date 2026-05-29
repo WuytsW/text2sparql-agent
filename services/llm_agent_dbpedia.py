@@ -176,9 +176,9 @@ class LLMAgentDBpedia:
         self.app = None  # reset workflow on model change
         self.current_model = model_name
 
-    def _translate_step(self, nlq: str):
+    def _translate_step(self, nlq: str, use_llm_translate: bool = True) -> str:
         try:
-            translated_question = translate_question(nlq, self.translation_llm)
+            translated_question = translate_question(nlq, self.translation_llm, use_llm=use_llm_translate)
         except Exception as e:
             logging.warning(f"Translation failed, using original question: {e}")
             translated_question = nlq
@@ -317,7 +317,16 @@ class LLMAgentDBpedia:
         log_message(step_name="Similar examples retrieved for ICL", color="Yellow", messages=[example])
         return example
 
-    def generate_sparql(self, input_question: str, model_name: str = "openai/gpt-4o-mini", log_calls: bool = True, temperature: float = 0, use_translate: bool = True, use_icl: bool = True, use_eat: bool = True, use_context: bool = True) -> dict:
+    def generate_sparql(
+            self, input_question: str, 
+            model_name: str = "openai/gpt-4o-mini", 
+            log_calls: bool = True, 
+            temperature: float = 0, 
+            use_translate: bool = True, 
+            use_icl: bool = True, use_eat: bool = True, 
+            use_context: bool = True, 
+            use_llm_translate: bool = True
+            ) -> dict:
         """
         Convert a natural language question to a SPARQL query.
 
@@ -326,6 +335,7 @@ class LLMAgentDBpedia:
             model_name: OpenRouter model identifier (e.g. "openai/gpt-4o-mini")
             log_calls: If True, log LLM calls
             temperature: The temperature for LLM sampling
+            use_llm_translate: If True, use LLM for translation
 
         Returns:
             Dict with translated_question, query, prompt_tokens, completion_tokens, requests
@@ -346,7 +356,7 @@ class LLMAgentDBpedia:
             with get_openai_callback() as cb:
                 if use_translate:
                     _t0 = time.perf_counter()
-                    translated_question = self._translate_step(input_question)
+                    translated_question = self._translate_step(input_question, use_llm_translate=use_llm_translate)
                     self._step_times.append(f"translation: {time.perf_counter() - _t0:.2f}s")
                 else:
                     translated_question = input_question

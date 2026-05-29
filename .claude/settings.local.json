@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Admin\\\\Documents\\\\VSCode\\\\text2sparql\\\\text2sparql-agent\" -Recurse -Filter \"*.py\")"
+    ]
+  }
+}

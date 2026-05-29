@@ -56,7 +56,7 @@ def _load_nllb():
     return _nllb_tokenizer, _nllb_model
 
 
-def translate_question(question: str, llm) -> str:
+def translate_question(question: str, llm, use_llm: bool = False) -> str:
     """
     Always sends question to the LLM.
     LLM decides whether to keep it or translate it to English.
@@ -65,7 +65,6 @@ def translate_question(question: str, llm) -> str:
     if not question:
         raise ValueError("Empty question provided.")
 
-    return _translate_with_nllm(question)
     return _translate_with_llm(question, llm)
 
 
