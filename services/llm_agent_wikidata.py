@@ -71,7 +71,7 @@ class LLMAgentWikidata:
         self.app = None
 
         self.log_handler = LogLLMCallbackHandler()
-        self._init_llms(model_name)
+        self._init_llm(model_name)
         self._step_times: list = []
         self._use_translate = True
         self._use_icl = True
@@ -79,76 +79,13 @@ class LLMAgentWikidata:
         self._use_context = True
         ### END Initialize agent
 
-    def _init_llms(self, model_name: str, log_calls: bool = False, temperature: float = 0):
-        # OpenRouter routes qwen models to Novita's /completions endpoint by default,
-        # but Novita only supports /chat/completions for these models. Ignoring Novita
-        # forces OpenRouter to pick a provider that handles chat completions correctly.
-        # DeepInfra is also excluded because it frequently rate-limits (429) Qwen models.
+    def _init_llm(self, model_name: str, log_calls: bool = False, temperature: float = 0):
+
         _or_kwargs = {"extra_body": {"provider": {"ignore": ["Novita"]}}}
 
-        self.llm_eat = ChatOpenAI(
+        self.llm = ChatOpenAI(
             model=model_name,
-            api_key=os.getenv("mKGQAgent_EAT_LLM"),
-            base_url="https://openrouter.ai/api/v1",
-            model_kwargs=_or_kwargs,
-            temperature=temperature,
-            max_retries=5,
-            callbacks=[self.log_handler]
-        )
-
-        self.llm_execution_original = ChatOpenAI(
-            model=model_name,
-            api_key=os.getenv("mKGQAgent_Execution_original_LLM"),
-            base_url="https://openrouter.ai/api/v1",
-            model_kwargs=_or_kwargs,
-            temperature=temperature,
-            max_retries=5,
-            callbacks=[self.log_handler]
-        )
-
-        self.entities_llm = ChatOpenAI(
-            model=model_name,
-            api_key=os.getenv("mKGQAgent_Entities_LLM"),
-            base_url="https://openrouter.ai/api/v1",
-            temperature=temperature,
-            model_kwargs=_or_kwargs,
-            max_retries=5,
-            callbacks=[self.log_handler]
-        )
-
-        self.profile_llm = ChatOpenAI(
-            model=model_name,
-            api_key=os.getenv("mKGQAgent_Shapes_LLM"),
-            base_url="https://openrouter.ai/api/v1",
-            model_kwargs=_or_kwargs,
-            temperature=temperature,
-            max_retries=5,
-            callbacks=[self.log_handler]
-        )
-
-        self.translation_llm = ChatOpenAI(
-            model=model_name,
-            api_key=os.getenv("mKGQAgent_Translation_LLM"),
-            base_url="https://openrouter.ai/api/v1",
-            model_kwargs=_or_kwargs,
-            temperature=temperature,
-            max_retries=5,
-            callbacks=[self.log_handler]
-        )
-
-        self.profile_check_llm = ChatOpenAI(
-            model=model_name,
-            api_key=os.getenv("mKGQAgent_Context_LLM", os.getenv("mKGQAgent_Execution_original_LLM")),
-            base_url="https://openrouter.ai/api/v1",
-            model_kwargs=_or_kwargs,
-            temperature=temperature,
-            max_retries=5,
-            callbacks=[self.log_handler]
-        )
-
-        self.check_llm = ChatOpenAI(
-            model=model_name,
-            api_key=os.getenv("mKGQAgent_Check_LLM", os.getenv("mKGQAgent_Context_LLM", os.getenv("mKGQAgent_Execution_original_LLM"))),
+            api_key=os.getenv("CeT2SAgent_LLM"),
             base_url="https://openrouter.ai/api/v1",
             model_kwargs=_or_kwargs,
             temperature=temperature,
@@ -157,19 +94,19 @@ class LLMAgentWikidata:
         )
 
         self._context_graph = make_context_graph_wikidata(
-            self.entities_llm, self.profile_llm, self.profile_check_llm, log_calls=log_calls
+            self.llm, self.llm, self.llm, log_calls=log_calls
         )
 
         self._sparql_agent = make_sparql_agent(
-            self.llm_execution_original,
+            self.llm,
             self.sparql_endpoint,
             self.lang,
             agent_prompt=sparql_agent_prompt,
             execute_fn=execute_wikidata,
         )
         self._sparql_graph = make_sparql_graph(
-            self.llm_execution_original,
-            self.check_llm,
+            self.llm,
+            self.llm,
             gen_prompt=generation_prompt,
             check_prompt=check_result_prompt,
             execute_fn=execute_wikidata,
@@ -180,7 +117,7 @@ class LLMAgentWikidata:
 
     def _translate_step(self, nlq: str):
         try:
-            translated_question = translate_question(nlq, self.translation_llm)
+            translated_question = translate_question(nlq, self.llm)
         except Exception as e:
             logging.warning(f"Translation failed, using original question: {e}")
             translated_question = nlq
@@ -193,7 +130,7 @@ class LLMAgentWikidata:
 
     def _eat_step(self, chat_history: list, nlq: str):
         try:
-            expected_answer_type = get_expected_answer_type(nlq, self.llm_eat)
+            expected_answer_type = get_expected_answer_type(nlq, self.llm)
             eat = expected_answer_type["expected_answer_type"]["eat"]
             eat_message = f"Expected answer type: {eat}"
             chat_history.append(AIMessage(eat_message))
@@ -287,8 +224,8 @@ class LLMAgentWikidata:
     def generate_sparql(self, input_question: str, model_name: str = "openai/gpt-4o-mini", log_calls: bool = True, temperature: float = 0, use_translate: bool = True, use_icl: bool = True, use_eat: bool = True, use_context: bool = True) -> dict:
         """Convert a natural language question to a SPARQL query over Wikidata."""
         try:
-            if model_name != self.current_model or temperature != self.llm_eat.temperature:
-                self._init_llms(model_name, log_calls=log_calls, temperature=temperature)
+            if model_name != self.current_model or temperature != self.llm.temperature:
+                self._init_llm(model_name, log_calls=log_calls, temperature=temperature)
             if self.app is None or (use_icl, use_eat, use_context) != (self._use_icl, self._use_eat, self._use_context):
                 self._use_icl, self._use_eat, self._use_context = use_icl, use_eat, use_context
                 self._init_workflow(use_context=use_context)
