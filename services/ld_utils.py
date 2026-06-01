@@ -1,9 +1,7 @@
-import json
 import os
 import re
 import time
 import requests
-from fuzzywuzzy import fuzz
 from SPARQLWrapper import SPARQLWrapper, JSON
 from rdflib.plugins.sparql.parser import parseQuery
 
@@ -91,45 +89,6 @@ def execute_wikidata(query: str, max_retries: int = 5) -> dict:
     return {"error": "max retries exceeded"}
 
 
-def search_entity(query: str, lang: str = "en", similarity: int = 90, search_limit: int = 3):
-  wdt_search_url = "https://www.wikidata.org/w/api.php?action=wbsearchentities&search={search}&format=json&language={lang}&uselang={lang}&type=item&limit={search_limit}"
-  try:
-    response = requests.get(wdt_search_url.format(search=query, lang=lang, search_limit=search_limit), headers={"User-Agent": _WIKIDATA_USER_AGENT}, timeout=20)
-    data = response.json()
-    ne_list = []
-    rel_list = []
-    for entity in data["search"]:
-        wdt_label = entity["label"]
-        wdt_id = entity["id"]
-
-        if fuzz.partial_ratio(query.lower(), wdt_label.lower()) > similarity:
-            relations = get_relations(wdt_id)
-            if len(relations) > 0:
-              rel_list += [{wdt_label: f"http://www.wikidata.org/prop/direct/{r}"} for r in relations]
-            else:
-              ne_list.append({wdt_label: f"http://www.wikidata.org/entity/{wdt_id}"})
-    return ne_list, rel_list
-  except Exception as e:
-    print(str(e))
-    return [], []
-
-def falcon_rel(query: str):
-  try:
-    FALCON_URL = "http://localhost:8000/process"
-    response = requests.post(FALCON_URL, data=json.dumps({"text": query}), timeout=30)
-    data = response.json()
-    rel_list = []
-    for relation in data[f"relations_wikidata"]:
-      rel_list.append({relation["label"]: relation["URI"]})
-    
-    ent_list = []
-    for entity in data["entities_wikidata"]:
-       ent_list.append({entity["label"]: entity["URI"]})
-    return rel_list, ent_list
-  except Exception as e:
-    print(str(e))
-    return [], []
-  
 def extract_code_blocks(text):
     import re
     pattern = r'```sparql(.*?)```'
@@ -259,15 +218,3 @@ def execute(query: str, endpoint_url: str = 'https://dbpedia.org/sparql'):
             return {'error': str(e)}
         return  {'error': str(e)}
 
-def get_relations(uri):
-  sparql = f"""
-  SELECT ?uri {{
-    <http://www.wikidata.org/entity/{uri}> <http://www.wikidata.org/prop/direct/P1687> ?uri
-  }}
-  """
-
-  results = transform_sparql_json_to_dataframe(execute(sparql))
-  if results.shape[0] > 0:
-    return [res.split("/")[-1] for res in results.uri]
-  else:
-    return []

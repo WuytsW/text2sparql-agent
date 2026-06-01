@@ -14,10 +14,7 @@ import json
 import logging
 import time
 
-from services.llm_utils import (
-    get_expected_answer_type,
-    correct_query_prefixes,
-)
+from services.llm_utils import get_expected_answer_type
 from services.context_graph_dbpedia import make_context_graph
 from services.sparql_graph import make_sparql_agent, make_sparql_graph
 from services.ld_utils import post_process

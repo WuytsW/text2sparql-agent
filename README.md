@@ -1,4 +1,4 @@
-# TEXT2SPARQL Agent
+# CeT2S-Agent
 
 A FastAPI service that converts natural language questions to SPARQL queries using LLM technology.
 
@@ -30,7 +30,7 @@ The API will be available at http://localhost:8000
 ### Convert text question to SPARQL
 
 ```
-GET /?question=Who is the president of the United States?&dataset=https://text2sparql.aksw.org/2025/dbpedia/
+GET /?question=Who is the president of the United States?&dataset=https://dbpedia.org/sparql/
 ```
 
 Parameters:
@@ -47,6 +47,5 @@ Example response:
 ```
 
 ## Supported Datasets
-
-- `https://text2sparql.aksw.org/2025/dbpedia/`
-- `https://text2sparql.aksw.org/2025/corporate/`
+- `https://dbpedia.org/sparql/`
+- `https://query.wikidata.org/sparql/`
